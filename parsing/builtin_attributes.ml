@@ -21,7 +21,7 @@ let string_of_cst = function
   | _ -> None
 
 let string_of_payload = function
-  | PStr[{pstr_desc=Pstr_eval({pexp_desc=Pexp_constant c},_)}] ->
+  | PStr[{pstr_desc=Pstr_eval({pexp_desc=Pexp_constant c; _ },_); _ }] ->
       string_of_cst c
   | _ -> None
 
@@ -33,10 +33,10 @@ let string_of_opt_payload p =
 let error_of_extension ext =
   let submessage_from main_loc main_txt = function
     | {pstr_desc=Pstr_extension
-           (({txt = ("ocaml.error"|"error"); loc}, p), _)} ->
+           (({txt = ("ocaml.error"|"error"); loc}, p), _); _ } ->
         begin match p with
         | PStr([{pstr_desc=Pstr_eval
-                     ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_))}, _)}
+                     ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_)); _ }, _); _ }
                ]) ->
             { Location.loc; txt = fun ppf -> Format.pp_print_text ppf msg }
         | _ ->
@@ -44,7 +44,7 @@ let error_of_extension ext =
                 Format.fprintf ppf
                   "Invalid syntax for sub-message of extension '%s'." main_txt }
         end
-    | {pstr_desc=Pstr_extension (({txt; loc}, _), _)} ->
+    | {pstr_desc=Pstr_extension (({txt; loc}, _), _); _ } ->
         { Location.loc; txt = fun ppf ->
             Format.fprintf ppf "Uninterpreted extension '%s'." txt }
     | _ ->
@@ -57,7 +57,7 @@ let error_of_extension ext =
       begin match p with
       | PStr [] -> raise Location.Already_displayed_error
       | PStr({pstr_desc=Pstr_eval
-                  ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_))}, _)}::
+                  ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_)); _ }, _); _ }::
              inner) ->
           let sub = List.map (submessage_from loc txt) inner in
           Location.error_of_printer ~loc ~sub Format.pp_print_text msg
@@ -72,14 +72,14 @@ let kind_and_message = function
       {pstr_desc=
          Pstr_eval
            ({pexp_desc=Pexp_apply
-                 ({pexp_desc=Pexp_ident{txt=Longident.Lident id}},
-                  [Nolabel,{pexp_desc=Pexp_constant (Pconst_string(s,_,_))}])
-            },_)}] ->
+                 ({pexp_desc=Pexp_ident{txt=Longident.Lident id; _ }; _ },
+                  [Nolabel,{pexp_desc=Pexp_constant (Pconst_string(s,_,_)); _ }])
+                  ; _ },_); _ }] ->
       Some (id, s)
   | PStr[
       {pstr_desc=
          Pstr_eval
-           ({pexp_desc=Pexp_ident{txt=Longident.Lident id}},_)}] ->
+           ({pexp_desc=Pexp_ident{txt=Longident.Lident id; _ }; _ },_); _ }] ->
       Some (id, "")
   | _ -> None
 
@@ -129,7 +129,7 @@ let check_alerts_inclusion ~def ~use loc attrs1 attrs2 s =
 let rec deprecated_mutable_of_attrs = function
   | [] -> None
   | {attr_name =  {txt = "ocaml.deprecated_mutable"|"deprecated_mutable"; _};
-     attr_payload = p} :: _ ->
+     attr_payload = p; _ } :: _ ->
      Some (string_of_opt_payload p)
   | _ :: tl -> deprecated_mutable_of_attrs tl
 
@@ -149,7 +149,7 @@ let check_deprecated_mutable_inclusion ~def ~use loc attrs1 attrs2 s =
         (Printf.sprintf "mutating field %s" (cat s txt))
 
 let rec attrs_of_sig = function
-  | {psig_desc = Psig_attribute a} :: tl ->
+  | {psig_desc = Psig_attribute a; _ } :: tl ->
       a :: attrs_of_sig tl
   | _ ->
       []
@@ -157,7 +157,7 @@ let rec attrs_of_sig = function
 let alerts_of_sig sg = alerts_of_attrs (attrs_of_sig sg)
 
 let rec attrs_of_str = function
-  | {pstr_desc = Pstr_attribute a} :: tl ->
+  | {pstr_desc = Pstr_attribute a; _ } :: tl ->
       a :: attrs_of_str tl
   | _ ->
       []
@@ -188,9 +188,9 @@ let warning_attribute ?(ppwarning = true) =
   let process_alert loc txt = function
     | PStr[{pstr_desc=
               Pstr_eval(
-                {pexp_desc=Pexp_constant(Pconst_string(s,_,_))},
+                {pexp_desc=Pexp_constant(Pconst_string(s,_,_)); _ },
                 _)
-           }] ->
+                ; _ }] ->
         begin try Warnings.parse_alert_option s
         with Arg.Bad msg -> warn_payload loc txt msg
         end
@@ -217,7 +217,7 @@ let warning_attribute ?(ppwarning = true) =
      attr_payload =
        PStr [
          { pstr_desc=
-             Pstr_eval({pexp_desc=Pexp_constant (Pconst_string (s, _, _))},_);
+             Pstr_eval({pexp_desc=Pexp_constant (Pconst_string (s, _, _)); _ },_);
            pstr_loc }
        ];
     } when ppwarning ->

@@ -110,7 +110,7 @@ module T = struct
     | Otag (_, t) -> sub.typ sub t
     | Oinherit t -> sub.typ sub t
 
-  let iter sub {ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs} =
+  let iter sub {ptyp_desc = desc; ptyp_loc = loc; ptyp_attributes = attrs; _ } =
     sub.location sub loc;
     sub.attributes sub attrs;
     match desc with
@@ -313,7 +313,7 @@ module M = struct
     | Pmod_unpack e -> sub.expr sub e
     | Pmod_extension x -> sub.extension sub x
 
-  let iter_structure_item sub {pstr_loc = loc; pstr_desc = desc} =
+  let iter_structure_item sub {pstr_loc = loc; pstr_desc = desc; _ } =
     sub.location sub loc;
     match desc with
     | Pstr_eval (x, attrs) ->
@@ -339,7 +339,7 @@ end
 module E = struct
   (* Value expressions for the core language *)
 
-  let iter sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
+  let iter sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs; _ } =
     sub.location sub loc;
     sub.attributes sub attrs;
     match desc with
@@ -426,7 +426,7 @@ end
 module P = struct
   (* Patterns *)
 
-  let iter sub {ppat_desc = desc; ppat_loc = loc; ppat_attributes = attrs} =
+  let iter sub {ppat_desc = desc; ppat_loc = loc; ppat_attributes = attrs; _ } =
     sub.location sub loc;
     sub.attributes sub attrs;
     match desc with

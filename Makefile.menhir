@@ -146,7 +146,7 @@ depend-menhir:
 # this rule depends on the variables CAMLDEP, DEPFLAGS, DEPINCLUDES
 # defined in Makefile, so it can only be invoked from the main Makefile
 
-include .depend.menhir
+# include .depend.menhir
 
 ## interpret-menhir
 

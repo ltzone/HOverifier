@@ -124,7 +124,7 @@ let store_escaped_char lexbuf c =
 let store_escaped_uchar lexbuf u =
   if in_comment () then store_lexeme lexbuf else store_string_utf_8_uchar u
 
-let compute_quoted_string_idloc {Location.loc_start = orig_loc } shift id =
+let compute_quoted_string_idloc {Location.loc_start = orig_loc ; _ } shift id =
   let id_start_pos = orig_loc.Lexing.pos_cnum + shift in
   let loc_start =
     Lexing.{orig_loc with pos_cnum = id_start_pos }

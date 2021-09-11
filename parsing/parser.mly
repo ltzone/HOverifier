@@ -285,7 +285,7 @@ let bigarray_function ~loc str name =
   ghloc ~loc (Ldot(Ldot(Lident "Bigarray", str), name))
 
 let bigarray_untuplify = function
-    { pexp_desc = Pexp_tuple explist; pexp_loc = _ } -> explist
+    { pexp_desc = Pexp_tuple explist; pexp_loc = _ ; _ } -> explist
   | exp -> [exp]
 
 let bigarray_get ~loc arr arg =
@@ -559,8 +559,8 @@ let package_type_of_module_type pmty =
         err pmty.pmty_loc "only 'with type t =' constraints are supported"
   in
   match pmty with
-  | {pmty_desc = Pmty_ident lid} -> (lid, [], pmty.pmty_attributes)
-  | {pmty_desc = Pmty_with({pmty_desc = Pmty_ident lid}, cstrs)} ->
+  | {pmty_desc = Pmty_ident lid; _ } -> (lid, [], pmty.pmty_attributes)
+  | {pmty_desc = Pmty_with({pmty_desc = Pmty_ident lid; _ }, cstrs); _ } ->
       (lid, List.map map_cstr cstrs, pmty.pmty_attributes)
   | _ ->
       err pmty.pmty_loc

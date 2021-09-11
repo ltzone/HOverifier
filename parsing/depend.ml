@@ -261,7 +261,7 @@ let rec add_expr bv exp =
                               "extension_constructor"); _ },
                      PStr [item]) as e) ->
       begin match item.pstr_desc with
-      | Pstr_eval ({ pexp_desc = Pexp_construct (c, None) }, _) -> add bv c
+      | Pstr_eval ({ pexp_desc = Pexp_construct (c, None) ; _ }, _) -> add bv c
       | _ -> handle_extension e
       end
   | Pexp_extension e -> handle_extension e

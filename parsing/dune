@@ -46,3 +46,8 @@
 (ocamllex
  (modules lexer)
  (mode fallback))
+
+(library
+ (name frontend)
+ (modules_without_implementation asttypes parsetree)
+ (libraries utils))

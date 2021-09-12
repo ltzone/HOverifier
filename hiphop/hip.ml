@@ -13,7 +13,7 @@ let rec input_lines file =
 
 
 
-let () =
+let hip_main () =
   let inputfile = (Sys.getcwd () ^ "/" ^ Sys.argv.(1)) in
 (*    let outputfile = (Sys.getcwd ()^ "/" ^ Sys.argv.(2)) in
 print_string (inputfile ^ "\n" ^ outputfile^"\n");*)

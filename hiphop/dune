@@ -1,7 +1,3 @@
-; (library
-;  (name hip)
-;  (libraries frontend utils z3))
-
-(executable
- (name hip)
+(library
+ (name hiphop)
  (libraries frontend utils z3))

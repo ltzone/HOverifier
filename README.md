@@ -13,7 +13,7 @@ To build up, you need to have `opam`
 opam switch create 4.12.0
 eval $(opam env)
 opam install dune z3 menhir 
-dune exec ./hiphop/hip.exe testcases/t1_fold.ml
+dune exec ./main.exe testcases/t1_fold.ml
 ```
 
 

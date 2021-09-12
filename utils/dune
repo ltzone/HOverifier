@@ -47,5 +47,4 @@
 
 (library
  (name utils)
- (modules_without_implementation config)
  (wrapped false))

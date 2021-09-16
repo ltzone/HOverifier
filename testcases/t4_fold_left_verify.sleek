@@ -1,0 +1,30 @@
+data node{
+  int val;
+  node next;
+}.
+  
+pred LL<n,s> == self = null & n=0 & s=0
+  or self::node<v,p> * p::LL<n-1,s2> & (s=v+s2).
+
+pred LL_foldl_plus<x,r> == self = null & r=x
+                        or self::node<y,p> * p::LL_foldl_plus<z,r> & (z=y+x).
+    
+HeapPred H(node x).
+
+// To be used by entail1
+lemma_safe self::LL<n,s> & s+x=r -> self::LL_foldl_plus<x,r>.
+  //self::LL_foldl_plus<x,s>.
+
+// To be used by entail2
+lemma_safe self::LL_foldl_plus<x,x+r> -> self::LL<n,r>.
+
+                          
+//Entail 1:
+checkentail x::LL<n,s> |- x::LL_foldl_plus<0,r>.
+expect Valid.
+print residue.
+
+//Entail 2:
+checkentail x::LL_foldl_plus<0,r> & res=r |- x::LL<n,s> & res=s.
+expect Valid.
+print residue.

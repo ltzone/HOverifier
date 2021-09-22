@@ -33,8 +33,14 @@ let double x = x + x
 
 (***** ISSUE: can't mechanize the process of unifying [fpure] with the post condition of double *)
 
-(* Requires      f(a) |= { true } *->:r { r=fpure(a) }
+(* twice f =
+   Requires      f(a) |= { true } *->:r { r=fpure(a) }
    Ensures[res]  res=fpure(fpure(a)) *)
+
+(* unify r=fpure(a) <-> res=x+x [r/res,a/x] 
+         r=?        <-> r=x+x
+*)
+
 
 let quad x = (twice double) x
 (* Requires      { true }

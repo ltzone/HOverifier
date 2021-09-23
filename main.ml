@@ -1,3 +1,3 @@
 open Hiphop
 
-let () = Hip.hip_main ()
+let () = Test_mlapi.main ()

@@ -1,0 +1,4 @@
+(library
+ (name hiphop)
+ (libraries frontend utils z3)
+ (c_library_flags -lstdc++))

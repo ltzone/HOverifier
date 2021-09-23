@@ -16,6 +16,11 @@ opam install dune z3 menhir
 dune exec ./main.exe testcases/t1_fold.ml
 ```
 
+To use z3 on MacOS, copy the dynamic library to the build directory
+```
+cp `opam config var z3:lib`/libz3.dylib .
+cp libz3.dylib _build/default
+```
 
 ## Acknowledgements
 

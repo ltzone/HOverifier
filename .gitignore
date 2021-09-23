@@ -1,4 +1,6 @@
 utils/config.ml
+libz3.dylib
+z3.log
 
 .vscode
 .DS_store

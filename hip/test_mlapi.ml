@@ -279,7 +279,7 @@ let fpa_example ( ctx : context ) =
     if (check solver []) != SATISFIABLE then
       raise (TestFailedException "")
     else
-      Printf.printf "Test passed.\n"
+      Printf.printf "Test 1 passed.\n"
   );
 
   (*  Show that the following are equal: *)

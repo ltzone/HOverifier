@@ -1,56 +1,50 @@
+(* logical expressions *)
+
+type logical_var = string
+
+type program_var = string
+
+type logical_fun = string
+
+type constant = Int of int
+
+type bin_operator = Plus | Minus | Max | Min
+
+type logical_exp = Pvar of program_var 
+                 | LVar of logical_var 
+                 | Fun of logical_fun * (logical_exp list)
+                 | Const of constant
+                 | Op of bin_operator * logical_exp * logical_exp
+
+type arith_pred_oper = Eq | Le
+
+type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
+               | And of pure_pred * pure_pred
+               | Or of pure_pred * pure_pred
+               | Neg of pure_pred
+               | True | False
+
+
+type pred_normal_form = {
+  pure: (logical_var list * pure_pred) list; 
+  (* disjunctive normal form of pure formulas, every clause comes
+     with a list of existential binders of logical variables *)
+  spec: fun_signature list;
+} 
+and fun_spec = {
+  fpre: pred_normal_form;
+  fpost: program_var * pred_normal_form;
+} 
+and fun_signature = {
+  fname: program_var;
+  fvar: program_var list;
+  fspec: fun_spec;  
+}
 (* basic term *)
-type basic_t = BINT of int | UNIT 
 
-type instant = string * (basic_t list) 
+type environ = fun_spec list
 
-(* To indicate weather there are partial applied continustiaon *)
-type residue = instant option 
-
-type event = One of string | Zero of string | Pred of instant | Any
-
-(*
-type stack_content = Cons of int | Variable of string | Apply of string * stack_content list 
-*)
-
-type stack = string * instant
-
-type es = Bot 
-        | Emp   
-        | Predicate of instant (* Q () *)
-        | Event of string
-        | Not of string
-        | Cons of es * es
-        | ESOr of es * es
-        | Kleene of es (* 0 or more, possibly infinite*)
-        | Omega of es(* infinite*)
-        | Underline
-
-type term = 
-      Num of int
-    | Var of string
-    | Plus of term * term 
-    | Minus of term * term 
-
-type bin_op = GT | LT | EQ | GTEQ | LTEQ
-
-type pi = 
-  | True
-  | False
-  | Atomic of bin_op * term * term
-  | And    of pi * pi
-  | Or     of pi * pi
-  | Imply  of pi * pi
-  | Not    of pi
-
-type side = (string * (es * es)) list   (* Eff(f()) = _^*.A -> U^*.(Res \/ emp) *)
-
-(* e.g: spec =  (n>0, emp, [Eff(f() = U^*] )) 
-                (n>0, Q(Foo()).END, [] )) 
-*)
-type spec = pi * es * side
-
-let default_spec = True, Emp, []
-
-type policy = Eff of string * es | Exn of string
-
-type evn = (es * es)list
+let default_spec = {
+  fpre={pure=[([], True)]; spec=[]};
+  fpost="res", {pure=[([], True)]; spec=[]};
+}

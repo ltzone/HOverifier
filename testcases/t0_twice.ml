@@ -1,8 +1,8 @@
 (* A higher order function for a pure function *)
 
 let twice f x = f (f x)
-(* Requires      f(a) |= { true } *->:r { r=fpure(a) }
-   Ensures[res]  res=fpure(fpure(a))
+(*   Requires      f(a) |= { true } *->:r { r=fpure(a) }
+     Ensures[res]  res=fpure(fpure(a))
 *)
 
 

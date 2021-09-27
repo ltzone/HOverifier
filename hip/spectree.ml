@@ -8,7 +8,7 @@ type logical_fun = string
 
 type constant = Int of int
 
-type bin_operator = Plus | Minus | Max | Min
+type bin_operator = Plus | Minus 
 
 type logical_exp = Pvar of program_var 
                  | LVar of logical_var 

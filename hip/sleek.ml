@@ -1,18 +1,91 @@
-(* 
 open List
-module Parsetree = Frontend.Parsetree
 open Spectree
-open Pretty
+(* open Pretty *)
 open Z3
+exception TestFailedException of string
 
-let rec term_to_expr ctx : Spectree.term -> Expr.expr = function
+
+let rec expr_to_expr ctx : logical_exp -> Expr.expr = function
+  | Pvar v  -> Arithmetic.Integer.mk_const_s ctx v
+  | LVar v ->Arithmetic.Integer.mk_const_s ctx v
+  | Fun (f, vs) -> 
+      let arg_list = List.init (List.length vs) (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
+      let target_sort = Arithmetic.Integer.mk_sort ctx in
+      let fun_decl = FuncDecl.mk_func_decl_s ctx f arg_list target_sort in
+      let fun_args = List.map (expr_to_expr ctx) vs in
+      FuncDecl.apply fun_decl fun_args
+  | Const (Int n) -> Arithmetic.Integer.mk_numeral_i ctx n
+  | Op (oper , t1, t2) -> 
+      let z3_constr = match oper with 
+                    | Plus -> Arithmetic.mk_add 
+                    | Minus -> Arithmetic.mk_sub in
+      z3_constr ctx [expr_to_expr ctx t1 ; expr_to_expr ctx t2]
+
+let rec pure_pred_to_goal ctx : pure_pred -> Expr.expr = function
+  | Arith (oper, t1, t2) ->
+      let t1_exp = expr_to_expr ctx t1 in
+      let t2_exp = expr_to_expr ctx t2 in
+      let oper_fun = match oper with
+      | Eq -> fun ctx e1 e2 -> Boolean.mk_and ctx [Arithmetic.mk_le ctx e1 e2 ; Arithmetic.mk_le ctx e2 e1 ]
+      | Le -> Arithmetic.mk_le in (* TODO: is this correct? *)
+      oper_fun ctx t1_exp t2_exp
+  | And (p1, p2) ->
+      let p1_exp = pure_pred_to_goal ctx p1 in
+      let p2_exp = pure_pred_to_goal ctx p2 in
+      Boolean.mk_and ctx [p1_exp; p2_exp]
+  | Or (p1, p2) -> 
+      let p1_exp = pure_pred_to_goal ctx p1 in
+      let p2_exp = pure_pred_to_goal ctx p2 in
+      Boolean.mk_or ctx [p1_exp; p2_exp]
+  | Neg p ->
+      let p = pure_pred_to_goal ctx p in
+      Boolean.mk_not ctx p
+  | True -> Boolean.mk_true ctx
+  | False -> Boolean.mk_false ctx
+
+
+let solver_wrapper ctx goal =
+  let solver = (Solver.mk_simple_solver ctx) in
+    let f e = (Solver.add solver [ e ]) in
+      ignore (List.map f (Goal.get_formulas goal)) ;
+    let q = (Solver.check solver []) in
+      if q != SATISFIABLE then 
+        raise (TestFailedException "")
+      else
+        let m = (Solver.get_model solver) in    
+        match m with 
+    | None -> 
+      raise (TestFailedException "")
+    | Some (m) -> 
+      Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
+      Printf.printf "Model: \n%s\n" (Model.to_string m) 
+
+
+let check_pure pre post : unit = 
+	let cfg = [("model", "true"); ("proof", "true")] in
+	let ctx = (mk_context cfg) in
+  let goal = Goal.mk_goal ctx true true true in 
+  let pre_formula = pure_pred_to_goal ctx pre in
+  let post_formula = pure_pred_to_goal ctx post in
+  let impl_formula = Boolean.mk_or ctx [ Boolean.mk_not ctx pre_formula; post_formula ] in
+  Goal.add goal [ impl_formula ];
+  solver_wrapper ctx goal
+
+
+let main () = 
+  let pre = (Arith (Eq, Const (Int 2), Const (Int 2))) in
+  let post = (Arith (Eq, (Const (Int 1)), Const (Int 1))) in
+  check_pure pre post
+
+      (* 
+let rec term_to_expr ctx : term -> Expr.expr = function
   | Num n        -> Arithmetic.Integer.mk_numeral_i ctx n
   | Var v          -> Arithmetic.Integer.mk_const_s ctx v
   | Plus (t1, t2)  -> Arithmetic.mk_add ctx [ term_to_expr ctx t1; term_to_expr ctx t2 ]
   | Minus (t1, t2) -> Arithmetic.mk_sub ctx [ term_to_expr ctx t1; term_to_expr ctx t2 ]
 
 
-let rec pi_to_expr ctx : Spectree.pi -> Expr.expr = function
+let rec pi_to_expr ctx : Parsetree.pi -> Expr.expr = function
   | True                -> Boolean.mk_true ctx
   | False               -> Boolean.mk_false ctx
   | Atomic (op, t1, t2) -> (
@@ -96,7 +169,7 @@ let rec esTail (es:es): event list =
 ;;
 
 
-(* let isBot (es:es) :bool= 
+let isBot (es:es) :bool= 
   match normalES es with
     Bot -> true
   | _ -> false 
@@ -261,7 +334,7 @@ let check_side (s1:side) (s2:side)  : (bool * string) =
 
 let printReport ((pi1, lhs, side1):spec) ((pi2, rhs, side2):spec) :(bool * string) = 
   let startTimeStamp = Sys.time() in
-  let (re1, temp1) = check_pure pi1 pi2 in 
+  let (re1, _) = check_pure pi1 pi2 in 
   let (re2, temp2) = check_containment lhs rhs in 
   let (re3, temp3) = check_side side1 side2  in 
   let verification_time = "[Verification Time: " ^ string_of_float ((Sys.time() -. startTimeStamp) *. 1000.0) ^ " ms]" in
@@ -271,11 +344,12 @@ let printReport ((pi1, lhs, side1):spec) ((pi2, rhs, side2):spec) :(bool * strin
   verification_time  ^"\n"^
   whole  ^"\n"^
   "------------------------------\n" ^
+  (*
   temp1 ^ 
+  "- - - - - - - - - - - - - -"^"\n" ^ *)
+  temp3 ^ 
   "- - - - - - - - - - - - - -"^"\n" ^
-  temp2 ^ 
-  "- - - - - - - - - - - - - -"^"\n" ^
-  temp3)
+  temp2)
   ;;
 
 let n_GT_0 : pi =
@@ -288,10 +362,5 @@ let n_GT_1 : pi =
 let testSleek (): string =
   let spec1 = (n_GT_0, Emp, [("Foo",(Emp,  Emp))]) in 
   let spec2 = (n_GT_1, Emp, [("Foo",(Emp,  Event "A"))]) in 
-  let (_, str) = printReport spec1 spec2 in str;; *)
-
-
-
-
-
- *)
+  let (_, str) = printReport spec1 spec2 in str;;
+  *)

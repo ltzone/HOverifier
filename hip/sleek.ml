@@ -137,22 +137,7 @@ let check_pure pre post : unit =
 
   (* let is = (Arithmetic.Integer.mk_sort ctx) in *)
   (* let forall_types = List.map (fun _ -> is) forall_vars in *)
-  let forall_xs = List.map (fun v -> 
-    
-    (* if String.equal v "f" then *)
-      
-      (* let fun_sort = Sort.mk_uninterpreted_s ctx "f_sort" in *)
-      (* Expr.mk_const_s ctx v fun_sort else *)
-      
-      (* let arg_list = List.init 2 (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
-      let target_sort = Arithmetic.Integer.mk_sort ctx in
-      let fun_decl = FuncDecl.mk_func_decl_s ctx "f" arg_list target_sort in
-      print_endline "OK";
-      let v = Expr.mk_const_f ctx fun_decl in print_endline "OK";v else *)
-
-
-
-   Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) forall_vars in
+  let forall_xs = List.map (fun v -> Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) forall_vars in
   (* let exists_types = List.map (fun _ -> is) exists_vars in *)
   let exists_xs = List.map (fun v -> Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) exists_vars in
   

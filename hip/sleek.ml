@@ -7,7 +7,7 @@ open Z3
 exception TestFailedException of string
 
 
-module VariableEnv = struct
+(* module VariableEnv = struct
 
   module VariableMap = Map.Make(String)
   
@@ -25,71 +25,68 @@ module VariableEnv = struct
       let new_expr = Arithmetic.Integer.mk_const_s ctx x in
       print_endline x; 
       new_expr, VariableMap.add x new_expr vmap *)
-end
+end *)
 
 
 
 
-let rec expr_to_expr ctx venv : logical_exp -> Expr.expr * VariableEnv.vmap = function
-  | Pvar v  -> VariableEnv.get_or_update venv ctx v
-  | LVar v -> VariableEnv.get_or_update venv ctx v
+let rec expr_to_expr ctx : logical_exp -> Expr.expr = function
+  | Pvar v  -> Arithmetic.Integer.mk_const_s ctx v
+  | LVar v -> Arithmetic.Integer.mk_const_s ctx v
   | Fun (f, vs) -> 
       let arg_list = List.init (List.length vs) (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
       let target_sort = Arithmetic.Integer.mk_sort ctx in
       let fun_decl = FuncDecl.mk_func_decl_s ctx f arg_list target_sort in
-      let fun_args, new_venv = 
-        List.fold_left 
-        (fun (res, old_env) v -> 
-          let new_expr, new_env = expr_to_expr ctx old_env v in
-          (new_expr::res, new_env)) ([], venv) vs  in
-      FuncDecl.apply fun_decl fun_args, new_venv
-  | Const (Int n) -> Arithmetic.Integer.mk_numeral_i ctx n, venv
+      let fun_args = 
+        List.map (expr_to_expr ctx) vs  in
+      Expr.mk_app ctx fun_decl fun_args
+  | Const (Int n) -> Arithmetic.Integer.mk_numeral_i ctx n
   | Op (oper , t1, t2) -> 
       let z3_constr = match oper with 
                     | Plus -> Arithmetic.mk_add 
                     | Minus -> Arithmetic.mk_sub in
-      let t1_expr, t1_env = expr_to_expr ctx venv t1 in
-      let t2_expr, t2_env = expr_to_expr ctx t1_env t2 in
-      z3_constr ctx [t1_expr ; t2_expr ], t2_env
+      let t1_expr = expr_to_expr ctx t1 in
+      let t2_expr = expr_to_expr ctx t2 in
+      z3_constr ctx [t1_expr ; t2_expr ]
 
-let rec pure_pred_to_goal ctx venv : pure_pred -> Expr.expr * VariableEnv.vmap = function
+let rec pure_pred_to_goal ctx : pure_pred -> Expr.expr = function
   | Arith (oper, t1, t2) ->
-      let t1_exp, t1_venv = expr_to_expr ctx venv t1 in
-      let t2_exp, t2_venv = expr_to_expr ctx t1_venv t2 in
+      let t1_exp = expr_to_expr ctx t1 in
+      let t2_exp = expr_to_expr ctx t2 in
       let oper_fun = match oper with
       | Eq -> Boolean.mk_eq
         (* fun ctx e1 e2 -> Boolean.mk_and ctx [Arithmetic.mk_le ctx e1 e2 ; Arithmetic.mk_le ctx e2 e1 ] *)
       | Le -> Arithmetic.mk_le in (* TODO: is this correct? *)
-      oper_fun ctx t1_exp t2_exp, t2_venv
+      oper_fun ctx t1_exp t2_exp
   | And (p1, p2) ->
-      let p1_exp, p1_venv = pure_pred_to_goal ctx venv p1 in
-      let p2_exp, p2_venv = pure_pred_to_goal ctx p1_venv p2 in
-      Boolean.mk_and ctx [p1_exp; p2_exp], p2_venv
+      let p1_exp = pure_pred_to_goal ctx p1 in
+      let p2_exp = pure_pred_to_goal ctx p2 in
+      Boolean.mk_and ctx [p1_exp; p2_exp]
   | Or (p1, p2) -> 
-    let p1_exp, p1_venv = pure_pred_to_goal ctx venv p1 in
-    let p2_exp, p2_venv = pure_pred_to_goal ctx p1_venv p2 in
-      Boolean.mk_or ctx [p1_exp; p2_exp], p2_venv
+    let p1_exp = pure_pred_to_goal ctx p1 in
+    let p2_exp = pure_pred_to_goal ctx p2 in
+      Boolean.mk_or ctx [p1_exp; p2_exp]
   | Neg p ->
-      let p, new_env = pure_pred_to_goal ctx venv p in
-      Boolean.mk_not ctx p, new_env
-  | True -> Boolean.mk_true ctx, venv
-  | False -> Boolean.mk_false ctx, venv
+      let p = pure_pred_to_goal ctx p in
+      Boolean.mk_not ctx p
+  | True -> Boolean.mk_true ctx
+  | False -> Boolean.mk_false ctx
 
 
 let solver_wrapper ctx goal =
   let solver = (Solver.mk_simple_solver ctx) in
-    let f e = (Solver.add solver [ e ]) in
+    let f e = (Solver.add solver [ Boolean.mk_not ctx e ]) in
       ignore (List.map f (Goal.get_formulas goal)) ;
     let q = (Solver.check solver []) in
       if q != SATISFIABLE then 
         (Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
-        (Printf.printf "Entailment fail\n") ;
-        let m = (Solver.get_proof solver) in  
+        (Printf.printf "Entailment success\n") ;
+        (* let m = (Solver.get_proof solver) in  
         match m with 
         | None -> 
           raise (TestFailedException "")
         | Some (m) -> 
-          Printf.printf "Model: \n%s\n" (Expr.to_string m))
+          Printf.printf "Model: \n%s\n" (Expr.to_string m)) *))
       else
         let m = (Solver.get_model solver) in    
         match m with 
@@ -97,7 +94,7 @@ let solver_wrapper ctx goal =
       raise (TestFailedException "")
     | Some (m) -> 
       Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
-      (Printf.printf "Entailment success\n") ;
+      (Printf.printf "Entailment fail\n") ;
       Printf.printf "Model: \n%s\n" (Model.to_string m);
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n
@@ -107,9 +104,9 @@ let rec fvars_of_expr e fvars : VarSet.t =
   let module VS = VarSet in match e with
   | Pvar v -> VS.add v fvars
   | LVar v -> VS.add v fvars
-  | Fun (v, vs) -> 
-      let fvars1 = VS.add v fvars in
-      List.fold_right (fvars_of_expr) vs fvars1
+  | Fun (_, vs) -> 
+      (* let fvars1 = VS.add v fvars in *)
+      List.fold_right (fvars_of_expr) vs fvars
   | Const _ -> fvars
   | Op (_, t1, t2) -> 
       List.fold_right (fvars_of_expr) [t1; t2] fvars
@@ -131,7 +128,6 @@ let check_pure pre post : unit =
 	let cfg = [("model", "true"); ("proof", "true")] in
 	let ctx = (mk_context cfg) in
   let goal = Goal.mk_goal ctx true true true in 
-  let venv = VariableEnv.empty in
 
   let pre_fvs = fvars_of_pure pre VarSet.empty in
   let post_fvs = fvars_of_pure post VarSet.empty in
@@ -141,19 +137,33 @@ let check_pure pre post : unit =
 
   (* let is = (Arithmetic.Integer.mk_sort ctx) in *)
   (* let forall_types = List.map (fun _ -> is) forall_vars in *)
-  let forall_names = List.map (fun v -> Symbol.mk_string ctx v) forall_vars in
-  let forall_xs = List.map (fun v -> Arithmetic.Integer.mk_const ctx v) forall_names in
+  let forall_xs = List.map (fun v -> 
+    
+    (* if String.equal v "f" then *)
+      
+      (* let fun_sort = Sort.mk_uninterpreted_s ctx "f_sort" in *)
+      (* Expr.mk_const_s ctx v fun_sort else *)
+      
+      (* let arg_list = List.init 2 (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
+      let target_sort = Arithmetic.Integer.mk_sort ctx in
+      let fun_decl = FuncDecl.mk_func_decl_s ctx "f" arg_list target_sort in
+      print_endline "OK";
+      let v = Expr.mk_const_f ctx fun_decl in print_endline "OK";v else *)
+
+
+
+   Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) forall_vars in
   (* let exists_types = List.map (fun _ -> is) exists_vars in *)
-  let exists_names = List.map (fun v -> Symbol.mk_string ctx v) exists_vars in
-  let exists_xs = List.map (fun v -> Arithmetic.Integer.mk_const ctx v) exists_names in
+  let exists_xs = List.map (fun v -> Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) exists_vars in
   
-  let pre_formula, pre_env = pure_pred_to_goal ctx venv pre in
-  let post_formula, _ = pure_pred_to_goal ctx pre_env post in
+  let pre_formula = pure_pred_to_goal ctx pre in
+  let post_formula = pure_pred_to_goal ctx post in
+
   
-  let post_formula = (Quantifier.mk_exists_const ctx  exists_xs post_formula 
+  let post_formula2 = (Quantifier.mk_exists_const ctx exists_xs post_formula 
                         (Some 1) [] [] (Some (Symbol.mk_string ctx "Qpost")) (Some (Symbol.mk_string ctx "skid2"))) in
 
-  let impl_formula = Boolean.mk_implies ctx pre_formula (Quantifier.expr_of_quantifier post_formula) in
+  let impl_formula = Boolean.mk_implies ctx pre_formula (Quantifier.expr_of_quantifier post_formula2) in
   let impl_formula = (Quantifier.mk_forall_const ctx  forall_xs impl_formula 
                           (Some 1) [] [] (Some (Symbol.mk_string ctx "Qimpl")) (Some (Symbol.mk_string ctx "skid2"))) in
   (* let impl_formula = (Boolean.mk_and ctx [Quantifier.expr_of_quantifier pre_formula; Boolean.mk_not ctx post_formula]) in *)
@@ -168,10 +178,11 @@ let check_pure pre post : unit =
 
 let main () = 
   (* let pre = False in *)
-  let pre = (And (Arith (Eq, (Pvar "x"), Const (Int 2)), Arith (Le, (Pvar "y"), Const (Int 6)))) in
+  let pre = And ((And (Arith (Eq, (Pvar "x"), Const (Int 2)), Arith (Le, (Pvar "y"), Const (Int 6)))),
+                  (Arith (Eq, Fun ("f", [Pvar "x"; Pvar "y"]), Pvar "z"))) in
   (* let post = True in *)
-  let post = And (And ((Arith (Eq, (Pvar "x"), Const (Int 2))), Arith (Le, (Pvar "y"), Const (Int 5))), 
-                Arith (Eq, Pvar "res", Const (Int 2))) in
+  let post = And (And ((Arith (Eq, (Pvar "x"), Const (Int 2))), Arith (Le, (Pvar "res"), Const (Int 6))), 
+                Arith (Eq, Pvar "z", Fun ("f", [Const (Int 3); Pvar "y"]))) in
   check_pure pre post;
 
 

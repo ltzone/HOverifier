@@ -15,12 +15,16 @@ module VariableEnv = struct
 
   let empty = VariableMap.empty
 
-  let get_or_update vmap ctx x = match (VariableMap.find_opt x vmap) with
+  let get_or_update vmap ctx x = 
+    let _ = vmap in
+    Arithmetic.Integer.mk_const_s ctx x, vmap
+    (** TODO: looks like we don't actually need such an envrionment *)
+    (* match (VariableMap.find_opt x vmap) with
   | Some w -> w, vmap
   | None -> 
       let new_expr = Arithmetic.Integer.mk_const_s ctx x in
       print_endline x; 
-      new_expr, VariableMap.add x new_expr vmap
+      new_expr, VariableMap.add x new_expr vmap *)
 end
 
 
@@ -94,7 +98,9 @@ let solver_wrapper ctx goal =
     | Some (m) -> 
       Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
       (Printf.printf "Entailment success\n") ;
-      Printf.printf "Counterexample Model: \n%s\n" (Model.to_string m) 
+      Printf.printf "Model: \n%s\n" (Model.to_string m);
+      let n = (Model.get_const_decls m) in    
+        List.iter (fun v -> print_endline (FuncDecl.to_string v)) n
 
 
 let rec fvars_of_expr e fvars : VarSet.t = 
@@ -162,10 +168,10 @@ let check_pure pre post : unit =
 
 let main () = 
   (* let pre = False in *)
-  let pre = (And (Arith (Eq, (Pvar "x"), Const (Int 2)), Arith (Eq, (Pvar "y"), Const (Int 2)))) in
+  let pre = (And (Arith (Eq, (Pvar "x"), Const (Int 2)), Arith (Le, (Pvar "y"), Const (Int 6)))) in
   (* let post = True in *)
   let post = And (And ((Arith (Eq, (Pvar "x"), Const (Int 2))), Arith (Le, (Pvar "y"), Const (Int 5))), 
-                Arith (Eq, Pvar "res", Const (Int 1))) in
+                Arith (Eq, Pvar "res", Const (Int 2))) in
   check_pure pre post;
 
 

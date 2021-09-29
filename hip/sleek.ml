@@ -99,6 +99,25 @@ let solver_wrapper ctx goal =
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n
 
+let solver_check_bool ctx goal =
+  let solver = (Solver.mk_simple_solver ctx) in
+    let f e = (Solver.add solver [ Boolean.mk_not ctx e ]) in
+      ignore (List.map f (Goal.get_formulas goal)) ;
+    let q = (Solver.check solver []) in
+      if q != SATISFIABLE then true
+      else
+        let m = (Solver.get_model solver) in    
+        match m with 
+    | None -> 
+      raise (TestFailedException "")
+    | Some (m) -> 
+      Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
+      (Printf.printf "Entailment fail\n") ;
+      Printf.printf "Model: \n%s\n" (Model.to_string m);
+      let n = (Model.get_const_decls m) in    
+        List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; false
+        
+
 
 let rec fvars_of_expr e fvars : VarSet.t = 
   let module VS = VarSet in match e with
@@ -122,9 +141,12 @@ let rec fvars_of_pure p fvars : VarSet.t =
       List.fold_right (fvars_of_pure) [p1; p2] fvars
   | Neg p -> fvars_of_pure p fvars
   | True | False -> fvars
-      
+    
 
-let check_pure pre post : unit = 
+let check_pure pre post : bool = 
+  print_endline "checking for pre and post";
+  print_endline ("[pre] " ^ pure_pred_to_string pre);
+  print_endline ("[post] " ^ pure_pred_to_string post);
 	let cfg = [("model", "true"); ("proof", "true")] in
 	let ctx = (mk_context cfg) in
   let goal = Goal.mk_goal ctx true true true in 
@@ -145,19 +167,24 @@ let check_pure pre post : unit =
   let post_formula = pure_pred_to_goal ctx post in
 
   
-  let post_formula2 = (Quantifier.mk_exists_const ctx exists_xs post_formula 
+  let post_formula2 = 
+    if List.length exists_xs = 0 then post_formula else
+    Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx exists_xs post_formula 
                         (Some 1) [] [] (Some (Symbol.mk_string ctx "Qpost")) (Some (Symbol.mk_string ctx "skid2"))) in
 
-  let impl_formula = Boolean.mk_implies ctx pre_formula (Quantifier.expr_of_quantifier post_formula2) in
-  let impl_formula = (Quantifier.mk_forall_const ctx  forall_xs impl_formula 
+  let impl_formula = Boolean.mk_implies ctx pre_formula post_formula2 in
+  let impl_formula = 
+    if List.length forall_xs = 0 then impl_formula else
+    Quantifier.expr_of_quantifier (Quantifier.mk_forall_const ctx  forall_xs impl_formula 
                           (Some 1) [] [] (Some (Symbol.mk_string ctx "Qimpl")) (Some (Symbol.mk_string ctx "skid2"))) in
   (* let impl_formula = (Boolean.mk_and ctx [Quantifier.expr_of_quantifier pre_formula; Boolean.mk_not ctx post_formula]) in *)
   (* let impl_formula = Boolean.mk_or ctx [Boolean.mk_not ctx pre_formula; post_formula] in *)
   (* Goal.add goal [ impl_formula ]; *)
-  Goal.add goal [ Quantifier.expr_of_quantifier impl_formula ];
-  print_endline (Expr.to_string (Quantifier.expr_of_quantifier impl_formula));
+  Goal.add goal [impl_formula];
+  print_endline (Expr.to_string (impl_formula));
   (* let quantified_formula = Quantifier.mk_forall_const ctx  in *)
-  solver_wrapper ctx goal
+  let res = solver_check_bool ctx goal in
+  print_endline "finished checking"; res
 
 
 
@@ -168,7 +195,7 @@ let main () =
   (* let post = True in *)
   let post = And (And ((Arith (Eq, (Pvar "x"), Const (Int 2))), Arith (Le, (Pvar "res"), Const (Int 6))), 
                 Arith (Eq, Pvar "z", Fun ("f", [Const (Int 3); Pvar "y"]))) in
-  check_pure pre post;
+  ignore (check_pure pre post)
 
 
 

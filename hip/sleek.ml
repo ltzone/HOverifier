@@ -32,7 +32,7 @@ end *)
 
 let rec expr_to_expr ctx : logical_exp -> Expr.expr = function
   | Pvar v  -> Arithmetic.Integer.mk_const_s ctx v
-  | LVar v -> Arithmetic.Integer.mk_const_s ctx v
+  | Lvar v -> Arithmetic.Integer.mk_const_s ctx v
   | Fun (f, vs) -> 
       let arg_list = List.init (List.length vs) (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
       let target_sort = Arithmetic.Integer.mk_sort ctx in
@@ -122,7 +122,7 @@ let solver_check_bool ctx goal =
 let rec fvars_of_expr e fvars : VarSet.t = 
   let module VS = VarSet in match e with
   | Pvar v -> VS.add v fvars
-  | LVar v -> VS.add v fvars
+  | Lvar v -> VS.add v fvars
   | Fun (_, vs) -> 
       (* let fvars1 = VS.add v fvars in *)
       List.fold_right (fvars_of_expr) vs fvars

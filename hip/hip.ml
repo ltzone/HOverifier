@@ -21,23 +21,30 @@ module SSet = Set.Make(String)
 type env = {
   (* module name -> a bunch of function specs *)
   specs : fun_signature list SMap.t;
+
+  res_index : int ref;
   (* fnames : SSet.t; *)
 }
 
 
 module Env = struct
   let empty = {
-    specs = SMap.empty
+    specs = SMap.empty;
+    res_index = ref 0;
   }
 
   let add_fn fname specs env =
-    { specs = SMap.add fname specs env.specs; }
+    { env with specs = SMap.add fname specs env.specs; }
   
   let add_spec_to_fn fname spec env = 
-    { specs = SMap.update fname (function None -> Some [spec]
+    { env with specs = SMap.update fname (function None -> Some [spec]
                                 | Some specs -> Some (spec::specs)) env.specs }
 
   let find_spec fname env = SMap.find_opt fname env.specs
+
+  let get_fresh_res_name env = env.res_index := !(env.res_index) + 1; "_r" ^ string_of_int !(env.res_index)
+
+  let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
 
 end
 
@@ -67,24 +74,29 @@ let collect_program_vars (rhs:Parsetree.expression) =
   traverse_to_body rhs
 
 
-let normalize_dnf (a: (program_var list * pure_pred) list) : pure_pred = 
-  List.fold_right (fun v vs -> (Or (snd v, vs))) a False
+let normalize_dnf (a: (program_var list * pure_pred) list) base : pure_pred = 
+  List.fold_right (fun v vs -> (Or (snd v, vs))) a base
 
-(* TODO: first check partial/full application, then check pre-post SMT *)
-let check_spec_derive env pre_cond args (spec:fun_signature)  : pred_normal_form option =
+  (* TODO: first check partial/full application, then check pre-post SMT *)
+  let check_spec_derive env pre_cond args (spec:fun_signature)  : pred_normal_form option =
   let _ = env in
   let pred_to_check = spec.fspec.fpre in
-  let check_bool = Sleek.check_pure (normalize_dnf pre_cond) (normalize_dnf pred_to_check.pure) in
+  let check_bool = Sleek.check_pure (normalize_dnf pre_cond False) (normalize_dnf pred_to_check.pure False) in
   if check_bool then 
     (if List.length args = List.length spec.fvar then
-      (* partial application *)
-    Some {
-      pure= List.map (fun (prog_vars, preds) -> (prog_vars, And (preds, normalize_dnf (snd spec.fspec.fpost).pure))) pre_cond ;
-      spec= []
-    } else 
       (* full application *)
+      Some {
+        pure= List.map (fun (prog_vars, preds) -> (prog_vars,
+          let fpost_anchor, fpost_dnf = spec.fspec.fpost in
+          let fpost_ass = And (normalize_dnf fpost_dnf.pure False, preds) in
+          let new_name = (Env.get_fresh_res_name env) in 
+          subst_pure_pred fpost_anchor new_name fpost_ass
+        )) pre_cond ;
+        spec= []
+        } else 
+    (* partial application *)
     Some {
-      pure= List.map (fun (prog_vars, preds) -> (prog_vars, And (preds, normalize_dnf (snd spec.fspec.fpost).pure))) pre_cond ;
+      pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ;
       spec= [{
         fname=spec.fname^"'"; fvar= List.tl spec.fvar; fspec=spec.fspec 
       }]
@@ -98,11 +110,12 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
               (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
               env acc.spec in  
   (* move the function specifications into the envrionment *)
+  let res =
   match expr.pexp_desc with 
   | Pexp_fun (_, _, _ (*pattern*), expr) -> 
-      infer_of_expression env acc expr 
+      infer_of_expression env {pure=pre_cond; spec=[]}  expr 
       (* Note:
-         we assume trat lambda expressions only occurs at the beginning of a let declaration,
+         we assume that lambda expressions only occurs at the beginning of a let declaration,
          therefore we can safely ignore and proceed the forward verification.
       *)
 
@@ -122,6 +135,7 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs)
   | _ -> assert false
 
+    in print_endline (string_of_pred_normal_form res); res
 
 (* Check for each let function declaration *)
 let infer_of_value_binding env (val_binding:Parsetree.value_binding) 
@@ -139,7 +153,9 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
     | Some (pre, post) -> (normalSpec pre, normalSpec post) *)
   let inferred_post = infer_of_expression env spec.fpre body in
     let _ = fn_name, formals, inferred_post in
-inferred_post
+    let normalized_post = (normalize_dnf (snd spec.fpost).pure False) in
+    let substed_post = subst_pure_pred (fst spec.fpost) (Env.get_top_res_name env) normalized_post in
+      if (Sleek.check_pure (normalize_dnf inferred_post.pure False) substed_post) then "entail true" else "entail false" 
 
 
 
@@ -157,7 +173,7 @@ let infer_of_program env (prog:Parsetree.structure_item)
   ;;
 
 let test () = 
-  let inputfile = "testcases/t0_twice.ml" in
+  let inputfile = "testcases/trivial.ml" in
   let ic = open_in inputfile in
   try
     let lines =  (input_lines ic ) in
@@ -167,12 +183,13 @@ let test () =
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
     let prog = List.nth progs 0 in
     Format.printf "%a@." Printast.implementation [prog];
-    let env = Env.empty |> (Env.add_spec_to_fn "once" once_sig) in
+    let env = Env.empty |> (Env.add_spec_to_fn "once" once_sig) |> (Env.add_spec_to_fn "two_arg" two_arg_sig) in
 
-    let res = infer_of_program env prog in
+    let infer_post = infer_of_program env prog in
     flush stdout;                (* 现在写入默认设备 *)
     close_in ic                  (* 关闭输入通道 *);
-    print_endline "success verify"; res
+    print_endline "success infer"; print_endline infer_post
+
   with e ->                      (* 一些不可预见的异常发生 *)
     close_in_noerr ic;           (* 紧急关闭 *)
     raise e                      (* 以出错的形式退出: 文件已关闭,但通道没有写入东西 *)
@@ -180,7 +197,9 @@ let test () =
 
 
 let hip_main () =
-  let inputfile = (Sys.getcwd () ^ "/" ^ Sys.argv.(1)) in
+  let inputfile = 
+    try (Sys.getcwd () ^ "/" ^ Sys.argv.(1)) with
+    e -> let _ = e in failwith "need to input a file name" in
 (*    let outputfile = (Sys.getcwd ()^ "/" ^ Sys.argv.(2)) in
 print_string (inputfile ^ "\n" ^ outputfile^"\n");*)
   let ic = open_in inputfile in

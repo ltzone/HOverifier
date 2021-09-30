@@ -1,10 +1,26 @@
 (* A higher order function for a pure function *)
 
 let once f x = f x
+(* forall fpure,
+     Requires      f(a) |= { true } *->:r { r=fpure(a) }
+     Ensures[res]  res=fpure(x)
+*)
+
+let incr x = x + 1
+(* Requires    true
+   Ensures[r]  r = x + 1
+*)
+
+(* fpure = \x. x+1 *)
+
+let incr_once x = once incr x
+(* Requires    true
+   Ensures[r]  r = x + 1
+*)
 
 let twice f x = f (f x)
 (*   Requires      f(a) |= { true } *->:r { r=fpure(a) }
-     Ensures[res]  res=fpure(fpure(a))
+     Ensures[res]  res=fpure(fpure(x))
 *)
 
 

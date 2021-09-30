@@ -183,7 +183,9 @@ let test () =
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
     let prog = List.nth progs 0 in
     Format.printf "%a@." Printast.implementation [prog];
-    let env = Env.empty |> (Env.add_spec_to_fn "once" once_sig) |> (Env.add_spec_to_fn "two_arg" two_arg_sig) in
+    let env = Env.empty |> (Env.add_spec_to_fn "once" once_sig) 
+                        |> (Env.add_spec_to_fn "two_arg" two_arg_sig)
+                        |> (Env.add_spec_to_fn "twice" twice_sig) in
 
     let infer_post = infer_of_program env prog in
     flush stdout;                (* 现在写入默认设备 *)

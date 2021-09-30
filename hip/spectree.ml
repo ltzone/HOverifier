@@ -116,6 +116,12 @@ let twice_spec = {
   fpost="res", {pure=[([], Arith (Eq, Pvar "res", (Fun ("fpure", [ Fun ("fpure", [Pvar "x"]) ] ))))]; spec=[]};
 }
 
+let twice_sig = {
+  fname="twice";
+  fvar=["f";"x"];
+  fspec=twice_spec
+}
+
 
 let once_spec = {
   fpre={pure=[([], True)]; spec=[

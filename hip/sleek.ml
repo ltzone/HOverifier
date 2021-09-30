@@ -101,7 +101,9 @@ let solver_wrapper ctx goal =
 
 let solver_check_bool ctx goal =
   let solver = (Solver.mk_simple_solver ctx) in
-    let f e = (Solver.add solver [ Boolean.mk_not ctx e ]) in
+    let f e = 
+      (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
+    Solver.add solver [ Boolean.mk_not ctx e ] in
       ignore (List.map f (Goal.get_formulas goal)) ;
     let q = (Solver.check solver []) in
       if q != SATISFIABLE then true

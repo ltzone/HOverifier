@@ -5,6 +5,8 @@ module Printast = Frontend.Printast
 module Parsetree = Frontend.Parsetree
 open Spectree
 
+let string_of_ident = Frontend.Longident.last
+
 let rec input_lines file =
   match try [input_line file] with End_of_file -> [] with
    [] -> []
@@ -78,64 +80,111 @@ let normalize_dnf (a: (program_var list * pure_pred) list) base : pure_pred =
   List.fold_right (fun v vs -> (Or (snd v, vs))) a base
 
   (* TODO: first check partial/full application, then check pre-post SMT *)
-  let check_spec_derive env pre_cond args (spec:fun_signature)  : pred_normal_form option =
-  let _ = env in
+let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * pred_normal_form) option =
   let pred_to_check = spec.fspec.fpre in
   let check_bool = Sleek.check_pure (normalize_dnf pre_cond False) (normalize_dnf pred_to_check.pure False) in
   if check_bool then 
     (if List.length args = List.length spec.fvar then
       (* full application *)
-      Some {
+      let new_anchor = Env.get_fresh_res_name env in
+      Some (new_anchor, {
         pure= List.map (fun (prog_vars, preds) -> (prog_vars,
           let fpost_anchor, fpost_dnf = spec.fspec.fpost in
           let fpost_ass = And (normalize_dnf fpost_dnf.pure False, preds) in
-          let new_name = (Env.get_fresh_res_name env) in 
-          subst_pure_pred fpost_anchor new_name fpost_ass
-        )) pre_cond ;
+          let post_subst = subst_pure_pred fpost_anchor new_anchor fpost_ass in
+          let conj_res = And (preds, post_subst) in
+          let subst_res = subst_pure_preds spec.fvar args conj_res in
+          (* print_endline "----------->";
+          print_endline (pure_pred_to_string post_subst);
+          print_endline (String.concat "," spec.fvar);
+          print_endline (String.concat "," args);
+          print_endline (pure_pred_to_string preds);
+          print_endline (pure_pred_to_string subst_res);
+          print_endline "<-----------"; *)
+          subst_res)
+        ) pre_cond ;
         spec= []
-        } else 
+        }) else 
     (* partial application *)
-    Some {
+    let new_name = spec.fname^"'" in
+    Some (new_name, {
       pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ;
       spec= [{
-        fname=spec.fname^"'"; fvar= List.tl spec.fvar; fspec=spec.fspec 
+        fname=new_name; fvar= List.tl spec.fvar; fspec=spec.fspec 
       }]
-    })
+    }))
   else None
 
-let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.expression) : pred_normal_form  =
+let add_constraint (acc: pred_normal_form) (pred: pure_pred) : pred_normal_form =
+  { acc with pure= List.map (fun (vs, preds) -> vs, And (pred, preds)) (acc.pure) }
+
+
+let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.expression) : env * logical_var * pred_normal_form  =
+(* return value: anchor * inferred verification condition *)
+  (* I: move the function specifications into the envrionment *)
   let open Parsetree in
   let pre_cond = acc.pure in
   let env = List.fold_left 
               (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
               env acc.spec in  
-  (* move the function specifications into the envrionment *)
-  let res =
+  let acc = {pure=pre_cond; spec=[]} in
+
+  (* II: forward execution on res *)
+  let res :  env * logical_var * pred_normal_form =
   match expr.pexp_desc with 
   | Pexp_fun (_, _, _ (*pattern*), expr) -> 
-      infer_of_expression env {pure=pre_cond; spec=[]}  expr 
+      infer_of_expression env acc expr 
       (* Note:
          we assume that lambda expressions only occurs at the beginning of a let declaration,
          therefore we can safely ignore and proceed the forward verification.
       *)
 
-  | Pexp_apply ({pexp_desc=Pexp_ident {txt=fname;_} ;_ }, arg_list) (*expression * (arg_label * expression) list*) ->
-    let fname = Frontend.Longident.last fname in
-    let fspecs = Env.find_spec fname env in
+  | Pexp_constant (Pconst_integer (num, sufix)) ->
+      (* for constant x, 
+           add constraint _r = x /\ ... *)
+      let combined_num_string = match sufix with Some sufix -> String.make 1 sufix | None -> ""in
+      let int_val = int_of_string (num ^ combined_num_string) in
+      let fresh_anchor = Env.get_fresh_res_name env in
+      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Int int_val)) in 
+      env, fresh_anchor, add_constraint acc new_constraint
 
-    let arg_vars = List.map (fun (_, arg_exp) -> match arg_exp.pexp_desc with 
-                                                  Pexp_ident {txt=argname;_} -> Frontend.Longident.last argname 
-                                                  | _ -> assert false ) arg_list in
+  | Pexp_ident  {txt=ident;_} -> 
+    (* for variable x, just let the anchor to be x, which is equivalent to
+         adding constraint _r = x /\ ... *)
+    env, string_of_ident ident, acc
+
+  | Pexp_apply ({pexp_desc=Pexp_ident {txt=fname;_} ;_ }, arg_list) 
+    (* for application: [expression * (arg_label * expression) list]
+      split into several steps *) ->
+    let fname = string_of_ident fname in
+    let fspecs = Env.find_spec fname env in
+    let arg_expr_list = List.map snd arg_list in
+
+    (* Step 1: evaluate all the parameters *)
+    let eval_args (expr: expression) (last_res : env * logical_var list * pred_normal_form)
+      : env * logical_var list * pred_normal_form =
+      let old_env, arg_anchors, old_pred = last_res in
+      let new_env, new_anchor, new_cond = infer_of_expression old_env old_pred expr in
+      (new_env, new_anchor::arg_anchors, new_cond) in
+    let arg_vars = List.fold_right eval_args arg_expr_list (env, [], acc) in
+
+    let env, arg_vars, acc = arg_vars in
 
     (* find a function specification in the context that can be used for each disjunction branch *)
-    (match fspecs with None -> failwith "Function spec not found" | Some fspecs ->
+    (match fspecs with 
+    | None -> failwith "Function spec not found" 
+    | Some fspecs ->
     let valid_fspecs = List.filter_map 
-      (check_spec_derive env pre_cond arg_vars) fspecs in
-    let combine_fspecs {pure; spec} {pure=old_pure; spec=old_spec} = {pure=pure@old_pure;spec=spec@old_spec} in
-      List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs)
+      (check_spec_derive env acc.pure arg_vars) fspecs in
+    let unified_anchor = Env.get_fresh_res_name env in
+    let combine_fspecs {pure=old_pure; spec=old_spec} (anchor, {pure; spec}) = 
+      { pure= (List.map (fun (vs, pure) -> (vs, subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
+        spec=spec@old_spec
+      } in
+      (env, unified_anchor, List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs))
   | _ -> assert false
 
-    in print_endline (string_of_pred_normal_form res); res
+    in print_endline (match res with _, anchor, res ->  anchor ^ " : " ^  string_of_pred_normal_form (res)); res
 
 (* Check for each let function declaration *)
 let infer_of_value_binding env (val_binding:Parsetree.value_binding) 
@@ -146,16 +195,17 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
   let formals = collect_program_vars body in
   let spec = match (Env.find_spec fn_name env) with
             | Some (spec::_) -> spec
+            (* TODO: verify all specs *)
             | _ -> failwith ("not enough spec for " ^ fn_name) in
   let spec = spec.fspec in
     (* match function_spec body with
     | None -> default_spec
     | Some (pre, post) -> (normalSpec pre, normalSpec post) *)
-  let inferred_post = infer_of_expression env spec.fpre body in
-    let _ = fn_name, formals, inferred_post in
+  let inferred_env, post_anchor, inferred_post = infer_of_expression env spec.fpre body in
+    let _ = fn_name, formals, inferred_post, post_anchor, inferred_env in
     let normalized_post = (normalize_dnf (snd spec.fpost).pure False) in
     let substed_post = subst_pure_pred (fst spec.fpost) (Env.get_top_res_name env) normalized_post in
-      if (Sleek.check_pure (normalize_dnf inferred_post.pure False) substed_post) then "entail true" else "entail false" 
+      if (Sleek.check_pure (normalize_dnf inferred_post.pure False) substed_post) then true else false
 
 
 
@@ -172,6 +222,14 @@ let infer_of_program env (prog:Parsetree.structure_item)
   | _ -> assert false
   ;;
 
+let name_of_prog (prog: Parsetree.structure_item) : string =
+  match prog.pstr_desc with 
+  | Pstr_value (_ (*rec_flag*), x::_ (*value_binding list*)) ->
+    string_of_pattern x.pvb_pat.ppat_desc
+  | _ -> assert false
+  ;;
+
+
 let test () = 
   let inputfile = "testcases/trivial.ml" in
   let ic = open_in inputfile in
@@ -186,12 +244,14 @@ let test () =
     let env = Env.empty |> (Env.add_spec_to_fn "once" once_sig) 
                         |> (Env.add_spec_to_fn "two_arg" two_arg_sig)
                         |> (Env.add_spec_to_fn "twice" twice_sig) in
+    
+    List.iter (fun prog -> (if infer_of_program env prog 
+                              then Format.printf "Verify %s success\n" (name_of_prog prog)
+                              else Format.printf "Verify %s fail\n" (name_of_prog prog)); flush stdout) progs ;
 
-    let infer_post = infer_of_program env prog in
     flush stdout;                (* 现在写入默认设备 *)
     close_in ic                  (* 关闭输入通道 *);
-    print_endline "success infer"; print_endline infer_post
-
+    
   with e ->                      (* 一些不可预见的异常发生 *)
     close_in_noerr ic;           (* 紧急关闭 *)
     raise e                      (* 以出错的形式退出: 文件已关闭,但通道没有写入东西 *)

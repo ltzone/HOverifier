@@ -19,7 +19,7 @@ type logical_exp = Pvar of program_var
 let rec logical_exp_to_string = function
 | Pvar v -> v
 | Lvar v -> v
-| Fun (v, vs) -> String.concat "" ([v;"("] @ List.map logical_exp_to_string vs @ [")"] )
+| Fun (v, vs) -> String.concat "" ([v;"("] @ [(String.concat "," (List.map logical_exp_to_string vs))] @ [")"] )
 | Const (Int i) -> string_of_int i
 | Op (oper, t1, t2) ->
     let op_str = match oper with | Plus -> "+" | Minus -> "-" in
@@ -62,6 +62,18 @@ let rec subst_pure_pred a b = function
 | Neg p1 -> Neg (subst_pure_pred a b p1)
 | True -> True
 | False -> False
+
+
+(* replace ax in p by bx *)
+let rec subst_pure_preds ax bx p =
+  match ax, bx with
+  | a::ax', b::bx' -> 
+      let p' = subst_pure_pred a b p in
+      subst_pure_preds ax' bx' p'
+  | [], [] -> p
+  | _ -> failwith "Unmatched argument list in substitution"
+
+
 
 type pred_normal_form = {
   pure: (logical_var list * pure_pred) list; 
@@ -109,7 +121,7 @@ let twice_spec = {
       fvar=["a"];
       fspec={
         fpre={pure=[([], True)]; spec=[]};
-        fpost="res0", {pure=[([], Arith (Eq, Pvar "res0", Fun ("fpure", [Pvar "x"])))]; spec=[]}
+        fpost="res0", {pure=[([], Arith (Eq, Pvar "res0", Fun ("fpure", [Pvar "a"])))]; spec=[]}
       };  
     }
   ]};
@@ -127,15 +139,14 @@ let once_spec = {
   fpre={pure=[([], True)]; spec=[
     {
       fname="f";
-      fvar=["a"];
+      fvar=["x"];
       fspec={
         fpre={pure=[([], True)]; spec=[]};
-        fpost="r", {pure=[([], Arith (Eq, Pvar "r", Fun ("fpure", [Pvar "x"])))]; spec=[]}
+        fpost="r", {pure=[([], Arith (Le, Pvar "r", Fun ("fpure", [Pvar "a"])))]; spec=[]}
       };  
     }
-
   ]};
-  fpost="res", {pure=[([], Arith (Eq, Pvar "res", (Fun ("fpure", [Pvar "x"] ))))]; spec=[]};
+  fpost="p", {pure=[([], Arith (Le, Pvar "p", (Fun ("fpure", [Pvar "x"] ))))]; spec=[]};
 }
 
 let once_sig = {
@@ -156,7 +167,7 @@ let two_arg_spec = {
     }
 
   ]};
-  fpost="two_arg_spec", {pure=[([], Arith (Eq, Pvar "res", (Fun ("fpure", [Pvar "x"; Pvar "b"] ))))]; spec=[]};
+  fpost="two_arg_spec", {pure=[([], Arith (Eq, Pvar "res", (Fun ("fpure", [Pvar "a"; Pvar "b"] ))))]; spec=[]};
 }
 
 let two_arg_sig = {

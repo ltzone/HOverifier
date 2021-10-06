@@ -46,10 +46,18 @@ let rec pure_pred_to_string = function
 | Arith (oper, t1, t2) ->
   let op_str = match oper with | Eq -> "=" | Le -> "<=" in
     String.concat "" [" "; logical_exp_to_string t1; op_str; logical_exp_to_string t2; " "]
+| And (p1, True) -> pure_pred_to_string p1
+| And (True, p2) -> pure_pred_to_string p2
+| And (_, False) -> " false "
+| And (False, _) -> " false "
+| Or (p1, False) -> pure_pred_to_string p1
+| Or (False, p2) -> pure_pred_to_string p2
+| Or (p1, True) -> pure_pred_to_string p1
+| Or (True, p2) -> pure_pred_to_string p2
 | And (p1, p2) ->
-    String.concat "" [pure_pred_to_string p1 ; " /\\ "; pure_pred_to_string p2]
+    String.concat "" ["("; pure_pred_to_string p1 ; " /\\ "; pure_pred_to_string p2; ")"]
 | Or (p1, p2) ->
-  String.concat "" [pure_pred_to_string p1 ; " \\/ "; pure_pred_to_string p2]
+  String.concat "" ["(" ; pure_pred_to_string p1 ; " \\/ "; pure_pred_to_string p2; ")"]
 | Neg p1 ->
   String.concat "" ["~"; pure_pred_to_string p1]
 | True -> " true "
@@ -62,6 +70,7 @@ let rec subst_pure_pred a b = function
 | Neg p1 -> Neg (subst_pure_pred a b p1)
 | True -> True
 | False -> False
+
 
 
 (* replace ax in p by bx *)
@@ -92,6 +101,52 @@ and fun_signature = {
 }
 (* basic term *)
 
+let rec subst_pred_normal_form a b pnf = {
+  pure= List.map (fun (vs, pred) -> vs, subst_pure_pred a b pred) pnf.pure;
+  (* disjunctive normal form of pure formulas, every clause comes
+     with a list of existential binders of logical variables *)
+  spec= List.map (subst_fun_signature a b) pnf.spec
+ } 
+
+and subst_fun_signature a b fsig = 
+  { fsig with fspec = subst_spec a b fsig.fspec;
+              fname = if String.equal a fsig.fname then b else a }
+
+and subst_spec a b (fun_spec:fun_spec) = {
+  fpre= subst_pred_normal_form a b fun_spec.fpre;
+  fpost= (* TODO: alpha renaming *)
+     match fun_spec.fpost with
+     anchor, fpost -> (if String.equal a anchor then b else anchor), 
+                      subst_pred_normal_form a b fpost 
+}
+
+(* replace ax in p by bx *)
+let rec subst_fun_signatures ax bx p =
+  match ax, bx with
+  | a::ax', b::bx' -> 
+      let p' = subst_fun_signature a b p in
+      subst_fun_signatures ax' bx' p'
+  | [], [] -> p
+  | _ -> failwith "Unmatched argument list in substitution"
+
+let rec subst_pred_normal_forms ax bx p =
+  match ax, bx with
+  | a::ax', b::bx' -> 
+      let p' = subst_pred_normal_form a b p in
+      subst_pred_normal_forms ax' bx' p'
+  | [], [] -> p
+  | _ -> failwith "Unmatched argument list in substitution"
+
+let rec subst_specs ax bx p =
+  match ax, bx with
+  | a::ax', b::bx' -> 
+      let p' = subst_spec a b p in
+      subst_specs ax' bx' p'
+  | [], [] -> p
+  | _ -> failwith "Unmatched argument list in substitution"
+    
+
+
 let rec string_of_pred_normal_form {pure; spec} = 
     (String.concat " \\/ " (List.map (fun (vs, nf) -> 
         "forall " ^ String.concat " " vs ^ ", " ^ pure_pred_to_string nf
@@ -112,70 +167,6 @@ let default_spec = {
   fpre={pure=[([], True)]; spec=[]};
   fpost="res", {pure=[([], True)]; spec=[]};
 }
-
-
-let twice_spec = {
-  fpre={pure=[([], True)]; spec=[
-    {
-      fname="f";
-      fvar=["a"];
-      fspec={
-        fpre={pure=[([], True)]; spec=[]};
-        fpost="res0", {pure=[([], Arith (Eq, Pvar "res0", Fun ("fpure", [Pvar "a"])))]; spec=[]}
-      };  
-    }
-  ]};
-  fpost="res", {pure=[([], Arith (Eq, Pvar "res", (Fun ("fpure", [ Fun ("fpure", [Pvar "x"]) ] ))))]; spec=[]};
-}
-
-let twice_sig = {
-  fname="twice";
-  fvar=["f";"x"];
-  fspec=twice_spec
-}
-
-
-let once_spec = {
-  fpre={pure=[([], True)]; spec=[
-    {
-      fname="f";
-      fvar=["x"];
-      fspec={
-        fpre={pure=[([], True)]; spec=[]};
-        fpost="r", {pure=[([], Arith (Le, Pvar "r", Fun ("fpure", [Pvar "a"])))]; spec=[]}
-      };  
-    }
-  ]};
-  fpost="p", {pure=[([], Arith (Le, Pvar "p", (Fun ("fpure", [Pvar "x"] ))))]; spec=[]};
-}
-
-let once_sig = {
-  fname="once";
-  fvar=["x"];
-  fspec=once_spec
-}
-
-let two_arg_spec = {
-  fpre={pure=[([], True)]; spec=[
-    {
-      fname="f";
-      fvar=["a"; "b"];
-      fspec={
-        fpre={pure=[([], True)]; spec=[]};
-        fpost="r", {pure=[([], Arith (Eq, Pvar "r", Fun ("fpure", [Pvar "a"; Pvar "b"])))]; spec=[]}
-      };  
-    }
-
-  ]};
-  fpost="two_arg_spec", {pure=[([], Arith (Eq, Pvar "res", (Fun ("fpure", [Pvar "a"; Pvar "b"] ))))]; spec=[]};
-}
-
-let two_arg_sig = {
-  fname="two_arg";
-  fvar=["x"; "y"];
-  fspec=two_arg_spec
-}
-
 
 (*   Requires      f(a) |= { true } *->:r { r=fpure(a) }
      Ensures[res]  res=fpure(fpure(a))

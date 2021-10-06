@@ -960,6 +960,8 @@ and directive_argument i ppf x =
 
 let interface ppf x = list 0 signature_item ppf x;;
 
-let implementation ppf x = list 0 structure_item ppf x;;
+let implementation ppf x = 
+    (* list 0 structure_item ppf x;; *)
+    List.iteri (fun i x -> structure_item i ppf x) x ;;
 
 let top_phrase ppf x = toplevel_phrase 0 ppf x;;

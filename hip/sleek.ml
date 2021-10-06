@@ -146,7 +146,7 @@ let rec fvars_of_pure p fvars : VarSet.t =
     
 
 let check_pure pre post : bool = 
-  print_endline "checking for pre and post";
+  print_endline "sleek: checking for pre and post";
   print_endline ("[pre] " ^ pure_pred_to_string pre);
   print_endline ("[post] " ^ pure_pred_to_string post);
 	let cfg = [("model", "true"); ("proof", "true")] in
@@ -183,10 +183,11 @@ let check_pure pre post : bool =
   (* let impl_formula = Boolean.mk_or ctx [Boolean.mk_not ctx pre_formula; post_formula] in *)
   (* Goal.add goal [ impl_formula ]; *)
   Goal.add goal [impl_formula];
-  print_endline (Expr.to_string (impl_formula));
+  (* print_endline (Expr.to_string (impl_formula)); *)
   (* let quantified_formula = Quantifier.mk_forall_const ctx  in *)
   let res = solver_check_bool ctx goal in
-  print_endline "finished checking"; res
+  (* print_endline "finished checking";  *)
+  res
 
 
 

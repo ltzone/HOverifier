@@ -48,6 +48,8 @@ module Env = struct
 
   let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
 
+  let available_names env = List.map fst (SMap.bindings (env.specs))
+
 end
 
 
@@ -79,6 +81,11 @@ let collect_program_vars (rhs:Parsetree.expression) =
 let normalize_dnf (a: (program_var list * pure_pred) list) base : pure_pred = 
   List.fold_right (fun v vs -> (Or (snd v, vs))) a base
 
+let rec split_nth (n:int) prev xs =
+  if n <= 0 then prev, xs else
+   split_nth (n-1) (List.append prev [List.hd xs]) (List.tl xs)
+
+
   (* TODO: first check partial/full application, then check pre-post SMT *)
 let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * pred_normal_form) option =
   let pred_to_check = spec.fspec.fpre in
@@ -107,10 +114,15 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
         }) else 
     (* partial application *)
     let new_name = spec.fname^"'" in
+    (* let () = print_endline (string_of_int (List.length spec.fvar)) in 
+    let () = print_endline (string_of_int (List.length args)) in *)
+    let applied_args, rem_args = 
+        split_nth (List.length args) [] spec.fvar in
     Some (new_name, {
       pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ;
       spec= [{
-        fname=new_name; fvar= List.tl spec.fvar; fspec=spec.fspec 
+        fname=new_name; fvar= rem_args; 
+        fspec=subst_specs applied_args args spec.fspec
       }]
     }))
   else None
@@ -151,12 +163,29 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
   | Pexp_ident  {txt=ident;_} -> 
     (* for variable x, just let the anchor to be x, which is equivalent to
          adding constraint _r = x /\ ... *)
-    env, string_of_ident ident, acc
+    let var_name = string_of_ident ident in
+    (* let fresh_name = Env.get_fresh_res_name env in *)
+    (* env, fresh_name, subst_pred_normal_form var_name fresh_name acc *)
+    env, var_name, acc
 
-  | Pexp_apply ({pexp_desc=Pexp_ident {txt=fname;_} ;_ }, arg_list) 
+  | Pexp_apply (f_exp, arg_list) 
     (* for application: [expression * (arg_label * expression) list]
       split into several steps *) ->
-    let fname = string_of_ident fname in
+    (* Step 0: evaluate the function *)
+    let env, fname, f_acc = 
+      infer_of_expression env acc f_exp in
+
+
+
+    (* Step 0: normalize the condition again *)
+    let pre_cond = f_acc.pure in
+    let env = List.fold_left 
+                (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
+                env f_acc.spec in  
+    let f_acc = {pure=pre_cond; spec=[]} in
+    (* print_endline (String.concat "," (Env.available_names env)); *)
+
+    let fname = fname in
     let fspecs = Env.find_spec fname env in
     let arg_expr_list = List.map snd arg_list in
 
@@ -166,20 +195,22 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       let old_env, arg_anchors, old_pred = last_res in
       let new_env, new_anchor, new_cond = infer_of_expression old_env old_pred expr in
       (new_env, new_anchor::arg_anchors, new_cond) in
-    let arg_vars = List.fold_right eval_args arg_expr_list (env, [], acc) in
+    let arg_vars = List.fold_right eval_args arg_expr_list (env, [], f_acc) in
 
     let env, arg_vars, acc = arg_vars in
 
     (* find a function specification in the context that can be used for each disjunction branch *)
     (match fspecs with 
-    | None -> failwith "Function spec not found" 
+    | None -> failwith ("Function spec not found for [" ^ fname ^ "]")
     | Some fspecs ->
     let valid_fspecs = List.filter_map 
       (check_spec_derive env acc.pure arg_vars) fspecs in
     let unified_anchor = Env.get_fresh_res_name env in
     let combine_fspecs {pure=old_pure; spec=old_spec} (anchor, {pure; spec}) = 
       { pure= (List.map (fun (vs, pure) -> (vs, subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
-        spec=spec@old_spec
+        spec= (List.map (
+          (* print_endline anchor; print_endline unified_anchor; *)
+         subst_fun_signature anchor unified_anchor) spec)@old_spec (* TODO: subst specification *)
       } in
       (env, unified_anchor, List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs))
   | _ -> assert false
@@ -230,34 +261,6 @@ let name_of_prog (prog: Parsetree.structure_item) : string =
   ;;
 
 
-let test () = 
-  let inputfile = "testcases/trivial.ml" in
-  let ic = open_in inputfile in
-  try
-    let lines =  (input_lines ic ) in
-    let line = List.fold_right (fun x acc -> acc ^ "\n" ^ x) (List.rev lines) "" in
-    
-
-    let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
-    let prog = List.nth progs 0 in
-    Format.printf "%a@." Printast.implementation [prog];
-    let env = Env.empty |> (Env.add_spec_to_fn "once" once_sig) 
-                        |> (Env.add_spec_to_fn "two_arg" two_arg_sig)
-                        |> (Env.add_spec_to_fn "twice" twice_sig) in
-    
-    List.iter (fun prog -> (if infer_of_program env prog 
-                              then Format.printf "Verify %s success\n" (name_of_prog prog)
-                              else Format.printf "Verify %s fail\n" (name_of_prog prog)); flush stdout) progs ;
-
-    flush stdout;                (* 现在写入默认设备 *)
-    close_in ic                  (* 关闭输入通道 *);
-    
-  with e ->                      (* 一些不可预见的异常发生 *)
-    close_in_noerr ic;           (* 紧急关闭 *)
-    raise e                      (* 以出错的形式退出: 文件已关闭,但通道没有写入东西 *)
-   ;;
-
-
 let hip_main () =
   let inputfile = 
     try (Sys.getcwd () ^ "/" ^ Sys.argv.(1)) with
@@ -298,6 +301,7 @@ print_string (inputfile ^ "\n" ^ outputfile^"\n");*)
     close_in ic                  (* 关闭输入通道 *)
 
   with e ->                      (* 一些不可预见的异常发生 *)
+    flush stdout;                (* 现在写入默认设备 *)
     close_in_noerr ic;           (* 紧急关闭 *)
     raise e                      (* 以出错的形式退出: 文件已关闭,但通道没有写入东西 *)
    ;;

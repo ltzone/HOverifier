@@ -1,15 +1,15 @@
 (* A higher order function for a pure function *)
-
-let once f x = f x
-(* forall fpure,
-     Requires      f(a) |= { true } *->:r { r=fpure(a) }
-     Ensures[res]  res=fpure(x)
-*)
-
 let incr x = x + 1
 (* Requires    true
    Ensures[r]  r = x + 1
 *)
+
+
+let once f x = f x
+(* Requires { f(a) |= { true } *->:r { r=fpure(a) } }
+   Ensures[p] { p = fpure(x) }
+*)
+
 
 (* fpure = \x. x+1 *)
 
@@ -18,9 +18,15 @@ let incr_once x = once incr x
    Ensures[r]  r = x + 1
 *)
 
+
 let twice f x = f (f x)
-(*   Requires      f(a) |= { true } *->:r { r=fpure(a) }
-     Ensures[res]  res=fpure(fpure(x))
+(* Requires { f(a) |= { true } *->:res0 { res0=fpure(a) } }
+   Ensures[res] { res = fpure(fpure(x)) }
+*)
+
+let incr_twice x = twice incr x
+(* Requires    true
+   Ensures[r]  r = x + 2
 *)
 
 
@@ -48,6 +54,11 @@ let double x = x + x
 (* Requires      { true }
    Ensures[res]  { res = x + x } *)
 
+
+let quad_fo x = (((+) x) (x) + ((+) x x))
+(* Requires      { true }
+   Ensures[res]  { res = x + x + x + x } *)
+   
 
 (***** ISSUE: can't mechanize the process of unifying [fpure] with the post condition of double *)
 

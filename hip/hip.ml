@@ -101,6 +101,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
           let post_subst = subst_pure_pred fpost_anchor new_anchor fpost_ass in
           let conj_res = And (preds, post_subst) in
           let subst_res = subst_pure_preds spec.fvar args conj_res in
+          (* let subst_res = And (preds, post_subst) in *)
           (* print_endline "----------->";
           print_endline (pure_pred_to_string post_subst);
           print_endline (String.concat "," spec.fvar);
@@ -119,7 +120,8 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
     let applied_args, rem_args = 
         split_nth (List.length args) [] spec.fvar in
     Some (new_name, {
-      pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ;
+      (* pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ; *)
+      pure= pre_cond ;
       spec= [{
         fname=new_name; fvar= rem_args; 
         fspec=subst_specs applied_args args spec.fspec
@@ -260,7 +262,7 @@ let name_of_prog (prog: Parsetree.structure_item) : string =
   | _ -> assert false
   ;;
 
-
+(* 
 let hip_main () =
   let inputfile = 
     try (Sys.getcwd () ^ "/" ^ Sys.argv.(1)) with
@@ -304,4 +306,4 @@ print_string (inputfile ^ "\n" ^ outputfile^"\n");*)
     flush stdout;                (* 现在写入默认设备 *)
     close_in_noerr ic;           (* 紧急关闭 *)
     raise e                      (* 以出错的形式退出: 文件已关闭,但通道没有写入东西 *)
-   ;;
+   ;; *)

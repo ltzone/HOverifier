@@ -119,14 +119,29 @@ let quad_fo_sig = {
 
 let plus_sig = {
   fname="+";
-  fvar=["x";"y"];
+  fvar=["arg1";"arg2"];
+  fspec={
+    fpre= {
+      pure=[([], True)];
+      spec=[]
+    };
+    fpost="plus_res", {pure=[([], Arith (Eq, Pvar "plus_res", (Op  
+       (Plus, Pvar "arg1", Pvar "arg2" )
+      )))]; spec=[]};
+  }
+}
+
+
+let three_add_sig = {
+  fname="three_add";
+  fvar=["x";"y";"z"];
   fspec={
     fpre= {
       pure=[([], True)];
       spec=[]
     };
     fpost="res", {pure=[([], Arith (Eq, Pvar "res", (Op  
-       (Plus, Pvar "x", Pvar "y" )
+       (Plus, Pvar "x", Op (Plus, Pvar "z", Pvar "y" ))
       )))]; spec=[]};
   }
 }
@@ -140,5 +155,6 @@ let sigs = [
   double_sig;
   quad_sig;
   quad_fo_sig;
+  three_add_sig;
   plus_sig; (* TODO: library *)
 ]

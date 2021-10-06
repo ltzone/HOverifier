@@ -149,9 +149,12 @@ let rec subst_specs ax bx p =
 
 let rec string_of_pred_normal_form {pure; spec} = 
     (String.concat " \\/ " (List.map (fun (vs, nf) -> 
-        "forall " ^ String.concat " " vs ^ ", " ^ pure_pred_to_string nf
-      ) pure)) ^ " with " ^
-    (String.concat "\n" (List.map string_of_fun_spec spec))
+      (if List.length vs = 0 then "" else 
+        "forall " ^ String.concat " " vs ^ ", ") ^ pure_pred_to_string nf
+      ) pure)) ^ 
+      if List.length spec = 0 then "" else
+      (" with \n\t" ^
+        (String.concat "\n\t" (List.map string_of_fun_spec spec)))
 
 and string_of_fun_spec {fname; fvar; fspec} = 
       fname ^ "(" ^ String.concat "," fvar ^ ") |= {" ^ 

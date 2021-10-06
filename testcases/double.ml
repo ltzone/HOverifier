@@ -5,6 +5,24 @@ let incr x = x + 1
 *)
 
 
+let double x = x + x
+(* Requires      { true }
+   Ensures[res]  { res = x + x } *)
+
+
+
+let three_add x y z = x + y + z
+(* Requires      { true }
+   Ensures[res]  { res = x + y + z } *)
+   
+
+
+let quad_fo x = (((+) x) (x) + ((+) x x))
+(* Requires      { true }
+   Ensures[res]  { res = x + x + x + x } *)
+      
+(* 
+
 let once f x = f x
 (* Requires { f(a) |= { true } *->:r { r=fpure(a) } }
    Ensures[p] { p = fpure(x) }
@@ -50,15 +68,8 @@ let incr_twice x = twice incr x
 *)
 
 
-let double x = x + x
-(* Requires      { true }
-   Ensures[res]  { res = x + x } *)
 
 
-let quad_fo x = (((+) x) (x) + ((+) x x))
-(* Requires      { true }
-   Ensures[res]  { res = x + x + x + x } *)
-   
 
 (***** ISSUE: can't mechanize the process of unifying [fpure] with the post condition of double *)
 
@@ -73,4 +84,4 @@ let quad_fo x = (((+) x) (x) + ((+) x x))
 
 let quad x = (twice double) x
 (* Requires      { true }
-   Ensures[res]  { res = x + x + x + x } *)
+   Ensures[res]  { res = x + x + x + x } *) *)

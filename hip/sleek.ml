@@ -44,12 +44,15 @@ let rec expr_to_expr ctx : logical_exp -> Expr.expr = function
   | Op (oper , t1, t2) -> 
       let z3_constr = match oper with 
                     | Plus -> Arithmetic.mk_add 
-                    | Minus -> Arithmetic.mk_sub in
+                    | Minus -> Arithmetic.mk_sub
+                    | Mult -> Arithmetic.mk_mul in
       let t1_expr = expr_to_expr ctx t1 in
       let t2_expr = expr_to_expr ctx t2 in
       z3_constr ctx [t1_expr ; t2_expr ]
 
-let rec pure_pred_to_goal ctx : pure_pred -> Expr.expr = function
+let rec pure_pred_to_goal ctx pred : Expr.expr =
+  let thinned_pred = thin_pred pred in
+  match thinned_pred with
   | Arith (oper, t1, t2) ->
       let t1_exp = expr_to_expr ctx t1 in
       let t2_exp = expr_to_expr ctx t2 in
@@ -99,6 +102,29 @@ let solver_wrapper ctx goal =
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n
 
+(* 
+z3 Cannot synthesize a fpure itself!
+*)
+(* let solver_check_bool' ctx goal =
+  let solver = (Solver.mk_simple_solver ctx) in
+    let f e = 
+      (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
+    Solver.add solver [ e ] in
+      ignore (List.map f (Goal.get_formulas goal)) ;
+    let q = (Solver.check solver []) in
+      if q != SATISFIABLE then false
+      else
+        let m = (Solver.get_model solver) in    
+        match m with 
+    | None -> 
+      raise (TestFailedException "")
+    | Some (m) -> 
+      Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
+      (Printf.printf "Entailment success\n") ;
+      Printf.printf "Model: \n%s\n" (Model.to_string m);
+      let n = (Model.get_const_decls m) in    
+        List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; true *)
+        
 let solver_check_bool ctx goal =
   let solver = (Solver.mk_simple_solver ctx) in
     let f e = 
@@ -119,7 +145,7 @@ let solver_check_bool ctx goal =
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; false
         
-
+        
 
 let rec fvars_of_expr e fvars : VarSet.t = 
   let module VS = VarSet in match e with
@@ -145,7 +171,31 @@ let rec fvars_of_pure p fvars : VarSet.t =
   | True | False -> fvars
     
 
+
+  let rec fname_of_expr e fvars : VarSet.t = 
+    let module VS = VarSet in match e with
+    | Fun (v, _) -> VS.add v fvars
+    | Op (_, t1, t2) -> 
+          List.fold_right (fname_of_expr) [t1; t2] fvars
+    | _ -> fvars
+  
+  
+let rec fname_of_pure p fvars : VarSet.t = 
+  let module VS = VarSet in match p with
+  | Arith (_, t1, t2) ->
+      List.fold_right (fname_of_expr) [t1; t2] fvars
+  | And (p1, p2) ->
+      List.fold_right (fname_of_pure) [p1; p2] fvars
+  | Or (p1, p2) ->
+      List.fold_right (fname_of_pure) [p1; p2] fvars
+  | Neg p -> fname_of_pure p fvars
+  | True | False -> fvars
+    
+
+
 let check_pure pre post : bool = 
+  let pre = thin_pred pre in
+  let post = thin_pred post in
   print_endline "sleek: checking for pre and post";
   print_endline ("[pre] " ^ pure_pred_to_string pre);
   print_endline ("[post] " ^ pure_pred_to_string post);
@@ -158,6 +208,12 @@ let check_pure pre post : bool =
   let post_exs = VarSet.diff post_fvs pre_fvs in 
   let forall_vars = VarSet.elements pre_fvs in
   let exists_vars = VarSet.elements post_exs in 
+
+  (* let pre_fname = fname_of_pure pre VarSet.empty in *)
+  (* let post_fname = fname_of_pure post VarSet.empty in *)
+  (* let fname_to_instantiate = VarSet.diff pre_fname post_fname in *)
+  (* print_endline ("sleek: need to instantiate: " ^ String.concat "," (VarSet.elements fname_to_instantiate) ); *)
+
 
   (* let is = (Arithmetic.Integer.mk_sort ctx) in *)
   (* let forall_types = List.map (fun _ -> is) forall_vars in *)

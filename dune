@@ -2,3 +2,9 @@
  (name main)
  (libraries hiphop frontend utils z3 specs)
  (link_flags -cc g++))
+
+
+ ; (executable
+ ; (name playz3)
+ ; (libraries hiphop frontend utils z3 specs)
+ ; (link_flags -cc g++))

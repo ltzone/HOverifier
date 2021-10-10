@@ -1,4 +1,6 @@
-let div y x = if y = 0 then assert false else (x / y)
+let div y x = 
+   (* if y = 0 then assert false else  *)
+      (x / y)
 (* Requires    { y != 0 }
    Ensures  [r]{ r * y = x }
 *)

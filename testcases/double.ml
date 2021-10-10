@@ -21,26 +21,26 @@ let quad_fo x = (((+) x) (x) + ((+) x x))
 (* Requires      { true }
    Ensures[res]  { res = x + x + x + x } *)
       
-(* 
+
 
 let once f x = f x
 (* Requires { f(a) |= { true } *->:r { r=fpure(a) } }
    Ensures[p] { p = fpure(x) }
 *)
 
+let twice f x = f (f x)
+(* Requires { f(a) |= { true } *->:res0 { res0=fpure(a) } }
+   Ensures[res] { res = fpure(fpure(x)) }
+*)
+
 
 (* fpure = \x. x+1 *)
-
 let incr_once x = once incr x
 (* Requires    true
    Ensures[r]  r = x + 1
 *)
 
 
-let twice f x = f (f x)
-(* Requires { f(a) |= { true } *->:res0 { res0=fpure(a) } }
-   Ensures[res] { res = fpure(fpure(x)) }
-*)
 
 let incr_twice x = twice incr x
 (* Requires    true
@@ -84,4 +84,4 @@ let incr_twice x = twice incr x
 
 let quad x = (twice double) x
 (* Requires      { true }
-   Ensures[res]  { res = x + x + x + x } *) *)
+   Ensures[res]  { res = x + x + x + x } *)

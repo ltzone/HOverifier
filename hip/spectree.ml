@@ -8,7 +8,7 @@ type logical_fun = string
 
 type constant = Int of int
 
-type bin_operator = Plus | Minus 
+type bin_operator = Plus | Minus | Mult
 
 type logical_exp = Pvar of program_var 
                  | Lvar of logical_var 
@@ -22,7 +22,7 @@ let rec logical_exp_to_string = function
 | Fun (v, vs) -> String.concat "" ([v;"("] @ [(String.concat "," (List.map logical_exp_to_string vs))] @ [")"] )
 | Const (Int i) -> string_of_int i
 | Op (oper, t1, t2) ->
-    let op_str = match oper with | Plus -> "+" | Minus -> "-" in
+    let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" in
     String.concat "" ["("; logical_exp_to_string t1; op_str; logical_exp_to_string t2; ")"]
 
 let rec subst_logical_exp a b =
@@ -42,18 +42,34 @@ type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
                | Neg of pure_pred
                | True | False
 
+let rec thin_pred = function
+| Arith (oper, t1, t2) -> Arith (oper, t1, t2)
+| And (p1, True) -> thin_pred p1
+| And (True, p2) -> thin_pred p2
+| And (_, False) -> False
+| And (False, _) -> False
+| Or (p1, False) -> thin_pred p1
+| Or (False, p2) -> thin_pred p2
+| Or (p1, True) -> thin_pred p1
+| Or (True, p2) -> thin_pred p2
+| And (p1, p2) -> And (thin_pred p1, thin_pred p2)
+| Or (p1, p2) -> Or (thin_pred p1, thin_pred p2)
+| Neg p1 -> Neg (thin_pred p1)
+| True -> True
+| False -> False
+
 let rec pure_pred_to_string = function
 | Arith (oper, t1, t2) ->
   let op_str = match oper with | Eq -> "=" | Le -> "<=" in
     String.concat "" [" "; logical_exp_to_string t1; op_str; logical_exp_to_string t2; " "]
-| And (p1, True) -> pure_pred_to_string p1
+(* | And (p1, True) -> pure_pred_to_string p1
 | And (True, p2) -> pure_pred_to_string p2
 | And (_, False) -> " false "
 | And (False, _) -> " false "
 | Or (p1, False) -> pure_pred_to_string p1
 | Or (False, p2) -> pure_pred_to_string p2
 | Or (p1, True) -> pure_pred_to_string p1
-| Or (True, p2) -> pure_pred_to_string p2
+| Or (True, p2) -> pure_pred_to_string p2 *)
 | And (p1, p2) ->
     String.concat "" ["("; pure_pred_to_string p1 ; " /\\ "; pure_pred_to_string p2; ")"]
 | Or (p1, p2) ->

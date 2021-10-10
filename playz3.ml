@@ -16,7 +16,8 @@ let solver_wrapper ctx goal =
       raise (TestFailedException "")
     | Some (m) -> 
       Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
-      Printf.printf "Model: \n%s\n" (Model.to_string m) 
+      Printf.printf "Model: \n%s\n" (Model.to_string m);
+      flush stdout
 
 
 let model_converter_test (ctx: context) =
@@ -29,7 +30,30 @@ let model_converter_test (ctx: context) =
   (Goal.add g4 [ (Arithmetic.mk_gt ctx yr (Arithmetic.Real.mk_numeral_nd ctx 1 1))]);
   solver_wrapper ctx g4
 
-let main () =
+let find_expr_test (ctx:context) =
+  let int_sort = Arithmetic.Integer.mk_sort ctx in
+  let x = (Expr.mk_const ctx (Symbol.mk_string ctx "x") int_sort) in
+  let y = (Expr.mk_const ctx (Symbol.mk_string ctx "y") int_sort) in
+  let fpure = (FuncDecl.mk_func_decl_s ctx "fpure" [int_sort] int_sort) in
+
+  let formula =
+    (Boolean.mk_implies ctx
+    (Boolean.mk_eq ctx y 
+    (* (Arithmetic.mk_add ctx [x; x])) *)
+    (Expr.mk_app ctx fpure [x]))
+    (Boolean.mk_eq ctx y (Arithmetic.mk_add ctx [x; x])
+  )) in
+  let quantified_formula = 
+    Quantifier.mk_forall_const ctx [x; y] formula (Some 1) [] [] None None in
+  let g4 = Goal.mk_goal ctx true true true in 
+    (* model generation / unsat core generation / proof generation *)
+  (Goal.add g4 [ Quantifier.expr_of_quantifier quantified_formula ]);
+  print_endline "testing";
+  solver_wrapper ctx g4
+
+
+
+let main =
 	let cfg = [("model", "true"); ("proof", "true")] in
 	let ctx = (mk_context cfg) in
-  model_converter_test ctx
+  find_expr_test ctx

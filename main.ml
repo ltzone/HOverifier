@@ -15,10 +15,13 @@ let double_env =
   let open Specs.Double in
   make_sig sigs
 
-
+let div_env = 
+  let open Specs.Div in
+  make_sig sigs
 
 let test () = 
   let open Hiphop.Hip in
+  (* let inputfile = "testcases/div.ml" in *)
   let inputfile = "testcases/double.ml" in
   let ic = open_in inputfile in
   let output = ref "\nResult:" in
@@ -28,6 +31,7 @@ let test () =
     
 
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
+    (* let env = div_env in *)
     let env = double_env in
     
     List.iter (fun prog -> (  

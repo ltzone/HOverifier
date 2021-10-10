@@ -1,5 +1,13 @@
 # An automated verifier for Programs that use Higher-order Functions
 
+## TODO list
+
+- general specification
+- if structure
+- ADT, match structure
+- refine the disjunctive normal form reasoning
+- predicate system to support recursive reasoning
+- introduce separation logic
 
 ## Setup
 

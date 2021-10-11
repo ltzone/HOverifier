@@ -40,6 +40,31 @@ let incr_once x = once incr x
    Ensures[r]  r = x + 1
 *)
 
+(* true
+ for once [incr ; x]: 
+ 
+ arglist = [incr ; x]
+
+ Requires { f(a) |= { true } *->:r { r=fpure(a) } }
+ Ensures[p] { p = fpure(x) }
+
+ derive: env |- true => incr <: { true } *->:r { r=fpure(a) }
+
+ Goal: i.e. true -> incr.pre /\ incr.post -> r=fpure(a) [SOLVER]
+
+ SOLVER returns: success with fpure=\x.x+1
+
+
+ then FV-app gets: 
+  ~~r: r=fpure(x)~~
+  r: r=fpure(x) with \x.x+1
+
+
+REMARK: No matter how we choose to instantiate the fpure, it seems that
+  fpure should always be treated explicitly by the solver
+
+*)
+
 
 
 let incr_twice x = twice incr x

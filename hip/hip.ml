@@ -78,12 +78,13 @@ let collect_program_vars (rhs:Parsetree.expression) =
   traverse_to_body rhs
 
 
-let normalize_dnf (a: (program_var list * pure_pred) list) base : pure_pred = 
-  List.fold_right (fun v vs -> (Or (snd v, vs))) a base
 
 let rec split_nth (n:int) prev xs =
   if n <= 0 then prev, xs else
    split_nth (n-1) (List.append prev [List.hd xs]) (List.tl xs)
+
+
+
 
 
 
@@ -102,19 +103,19 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
 (* let check_env = check_spec env spec_to_check in *)
 (* if check_bool && check_env then  *)
   (if List.length args = List.length spec.fvar then
-    let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fspec.fpre in
+    let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
   let pure_to_check = subst_pre_to_check.pure in
-  let check_bool = Sleek.check_pure (normalize_dnf pre_cond False) (normalize_dnf pure_to_check False) in
+  let check_bool = Sleek.check_pure (pre_cond) (pure_to_check) in
     if check_bool then
       (* full application *)
       (let new_anchor = Env.get_fresh_res_name env in
       Some (new_anchor, {
-        pure= List.map (fun (prog_vars, preds) -> (prog_vars,
-          let fpost_anchor, fpost_dnf = spec.fspec.fpost in
-          let fpost_ass = And (normalize_dnf fpost_dnf.pure False, preds) in
-          let post_subst = subst_pure_pred fpost_anchor new_anchor fpost_ass in
-          let conj_res = And (preds, post_subst) in
-          let subst_res = subst_pure_preds spec.fvar args conj_res in
+        pure= List.concat_map (fun (preds) -> (
+          let fpost_anchor, fpost_dnf = spec.fpost in
+          let fpost_ass = preds_and_pred fpost_dnf.pure preds in
+          let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
+          let conj_res = preds_and_pred post_subst preds in
+          let subst_res = subst_pure_preds_list spec.fvar args conj_res in
           (* let subst_res = And (preds, post_subst) in *)
           (* print_endline "----------->";
           print_endline (pure_pred_to_string post_subst);
@@ -140,13 +141,14 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
       (* pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ; *)
       pure= pre_cond ;
       spec= [{
-        fname=new_name; fvar= rem_args; 
-        fspec=subst_specs applied_args args spec.fspec
+        fname=new_name; fvar= rem_args; pnames=spec.pnames;
+        fpre=subst_pred_normal_forms applied_args args spec.fpre;
+        fpost=(fst  spec.fpost, subst_pred_normal_forms applied_args args (snd spec.fpost));
       }]
     }))
 
 let add_constraint (acc: pred_normal_form) (pred: pure_pred) : pred_normal_form =
-  { acc with pure= List.map (fun (vs, preds) -> vs, And (pred, preds)) (acc.pure) }
+  { acc with pure= List.map (fun preds -> And (pred, preds)) (acc.pure) }
 
 
 let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.expression) : env * logical_var * pred_normal_form  =
@@ -225,7 +227,7 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       (check_spec_derive env acc.pure arg_vars) fspecs in
     let unified_anchor = Env.get_fresh_res_name env in
     let combine_fspecs {pure=old_pure; spec=old_spec} (anchor, {pure; spec}) = 
-      { pure= (List.map (fun (vs, pure) -> (vs, subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
+      { pure= (List.map (fun (pure) -> (subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
         spec= (List.map (
           (* print_endline anchor; print_endline unified_anchor; *)
          subst_fun_signature anchor unified_anchor) spec)@old_spec (* TODO: subst specification *)
@@ -246,15 +248,14 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
             | Some (spec::_) -> spec
             (* TODO: verify all specs *)
             | _ -> failwith ("not enough spec for " ^ fn_name) in
-  let spec = spec.fspec in
     (* match function_spec body with
     | None -> default_spec
     | Some (pre, post) -> (normalSpec pre, normalSpec post) *)
   let inferred_env, post_anchor, inferred_post = infer_of_expression env spec.fpre body in
     let _ = fn_name, formals, inferred_post, post_anchor, inferred_env in
-    let normalized_post = (normalize_dnf (snd spec.fpost).pure False) in
-    let substed_post = subst_pure_pred (fst spec.fpost) (Env.get_top_res_name env) normalized_post in
-      if (Sleek.check_pure (normalize_dnf inferred_post.pure False) substed_post) then true else false
+    let normalized_post = ( (snd spec.fpost).pure ) in
+    let substed_post = subst_pure_pred_list (fst spec.fpost) (Env.get_top_res_name env) normalized_post in
+      if (Sleek.check_pure ( inferred_post.pure ) substed_post) then true else false
 
 
 

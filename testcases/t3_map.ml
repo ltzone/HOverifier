@@ -6,6 +6,12 @@ type list = Nil
 
 (* A simple list that only allows integer elements *)
 
+(* 
+
+
+*)
+
+
 let rec map f = function
   | Nil -> Nil
   | Cons (x, xs') -> Cons (f x, map f xs')

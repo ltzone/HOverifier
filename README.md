@@ -3,11 +3,20 @@
 ## TODO list
 
 - general specification
+  - first implemented as user declared, then find ways to automate it
 - if structure
 - ADT, match structure
 - refine the disjunctive normal form reasoning
 - predicate system to support recursive reasoning
 - introduce separation logic
+- Assertion parser
+
+
+## Discussion
+
+- declare fpure explicitly, and add fpure to a list, but only allows fpure to be collected on toplevel of every specification
+  > is there any possibility for a local fpure?
+
 
 ## Setup
 

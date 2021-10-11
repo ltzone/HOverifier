@@ -1,11 +1,3 @@
-
-let trivial_env =
-  let open Specs.Trivial in
-  let open Hiphop.Hip in
-  Env.empty |> (Env.add_spec_to_fn "once" once_sig) 
-  |> (Env.add_spec_to_fn "two_arg" two_arg_sig)
-  |> (Env.add_spec_to_fn "twice" twice_sig) 
-
 let make_sig sigs =
   let open Hiphop.Hip in
   let open Hiphop in
@@ -19,10 +11,15 @@ let div_env =
   let open Specs.Div in
   make_sig sigs
 
+let trivial_env = 
+  let open Specs.Trivial in
+  make_sig sigs
+
 let test () = 
   let open Hiphop.Hip in
-  (* let inputfile = "testcases/div.ml" in *)
-  let inputfile = "testcases/double.ml" in
+  let inputfile = "testcases/div.ml" in
+  (* let inputfile = "testcases/double.ml" in *)
+  (* let inputfile = "testcases/trivial.ml" in *)
   let ic = open_in inputfile in
   let output = ref "\nResult:" in
   try
@@ -31,8 +28,9 @@ let test () =
     
 
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
-    (* let env = div_env in *)
-    let env = double_env in
+    let env = div_env in
+    (* let env = double_env in *)
+    (* let env = trivial_env in *)
     
     List.iter (fun prog -> (  
 

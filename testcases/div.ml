@@ -18,6 +18,6 @@ let twice f x = f (f x)
 
 
 let div_by_one_star x = twice div_by_one x
-(* Requires    { true }
+(* Requires    { true /\ twice[fpure(x)=x] }
    Ensures  [r]{ r=x }
 *)

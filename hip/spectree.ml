@@ -26,7 +26,6 @@ type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
               | True | False
 
 
-
 type pred_normal_form = {
   pure: ( pure_pred) list; 
   (* disjunctive normal form of pure formulas *)
@@ -40,6 +39,22 @@ and fun_signature = {
   fpost: program_var * pred_normal_form;
 }
 (* basic term *)
+
+type exp_type = Int
+
+type pred_type = Func of exp_type list | Prop of exp_type list
+
+type logical_function = {
+  pname: logical_fun;
+  pargs: (logical_var * exp_type) list;
+  pbody: logical_exp;
+}
+
+type logical_proposition = {
+  pname: logical_fun;
+  pargs: (logical_var * exp_type) list;
+  pbody: pure_pred list;
+}
 
 
 let rec thin_pred = function

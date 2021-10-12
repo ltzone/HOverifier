@@ -4,6 +4,7 @@
 
 - general specification
   - first implemented as user declared, then find ways to automate it
+  > prefer with explicit instantiation, because it fits the design of user-defined predicate
 - if structure
 - ADT, match structure
 - refine the disjunctive normal form reasoning

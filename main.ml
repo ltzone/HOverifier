@@ -7,9 +7,9 @@ let make_sig sigs predicates pty_env =
       ftype_context = pty_env;
   }
 
-(* let double_env = 
+let double_env = 
   let open Specs.Double in
-  make_sig sigs *)
+  make_sig sigs predicates pty_env
 
 let div_env = 
   let open Specs.Div in
@@ -21,8 +21,8 @@ let div_env =
 
 let test () = 
   let open Hiphop.Hip in
-  let inputfile = "testcases/div.ml" in
-  (* let inputfile = "testcases/double.ml" in *)
+  (* let inputfile = "testcases/div.ml" in *)
+  let inputfile = "testcases/double.ml" in
   (* let inputfile = "testcases/trivial.ml" in *)
   let ic = open_in inputfile in
   let output = ref "\nResult:" in
@@ -32,8 +32,8 @@ let test () =
     
 
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
-    let env = div_env in
-    (* let env = double_env in *)
+    (* let env = div_env in *)
+    let env = double_env in
     (* let env = trivial_env in *)
     
     List.iter (fun prog -> (  

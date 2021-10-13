@@ -2,6 +2,8 @@
 
 ## TODO list
 
+> issue, function as return value, how should the specification be layed out? { true } *-> {true with f(x)=... } ? or just f(x) = ...
+
 - subsumption check
   - what about a nested function specification?
     - example of div_by_one

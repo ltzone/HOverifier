@@ -17,9 +17,9 @@ let three_add x y z = x + y + z
    
 
 
-let quad_fo x = (((+) x) (x) + ((+) x x))
+(* let quad_fo x = (((+) x) (x) + ((+) x x))
 (* Requires      { true }
-   Ensures[res]  { res = x + x + x + x } *)
+   Ensures[res]  { res = x + x + x + x } *) *)
       
 
 

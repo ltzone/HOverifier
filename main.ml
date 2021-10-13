@@ -1,19 +1,18 @@
 let make_sig sigs =
-  let open Hiphop.Hip in
   let open Hiphop in
-  List.fold_right (fun (si:Spectree.fun_signature) -> Env.add_spec_to_fn si.fname si ) sigs Env.empty
+  List.fold_right (fun (si:Spectree.fun_signature) -> Spectree.Env.add_spec_to_fn si.fname si ) sigs Spectree.Env.empty
 
-let double_env = 
+(* let double_env = 
   let open Specs.Double in
-  make_sig sigs
+  make_sig sigs *)
 
 let div_env = 
   let open Specs.Div in
   make_sig sigs
 
-let trivial_env = 
+(* let trivial_env = 
   let open Specs.Trivial in
-  make_sig sigs
+  make_sig sigs *)
 
 let test () = 
   let open Hiphop.Hip in
@@ -37,15 +36,15 @@ let test () =
       let fname = (name_of_prog prog) in
       Format.printf "Verifying %s\n" fname;
     (* Format.printf "%a@." Printast.implementation [prog]; *)
-                              if infer_of_program env prog 
-                              then
-                                (output := !output ^ "\n " ^ fname ^ " verified";
-                                Format.printf "Verify %s success\n" fname)
-                              else 
-                                (output := !output ^ "\n " ^ fname ^ " failed";
-                                Format.printf "Verify %s fail\n" fname);
-                      print_endline "\n------------------------\n"
-                                )) progs ;
+        if infer_of_program env prog 
+        then
+          (output := !output ^ "\n " ^ fname ^ " verified";
+          Format.printf "Verify %s success\n" fname)
+        else 
+          (output := !output ^ "\n " ^ fname ^ " failed";
+          Format.printf "Verify %s fail\n" fname);
+          print_endline "\n------------------------\n"
+          )) progs ;
 
     flush stdout;                (* 现在写入默认设备 *)
     close_in ic                  (* 关闭输入通道 *);
@@ -62,9 +61,9 @@ let test () =
 
 (* let () = Test_mlapi.main () *)
 let _ = 
-  (* print_endline "-------------- SLEEK MAIN ----------------";
-  Sleek.main ();
-  print_endline "--------------- HIP MAIN -----------------"; *)
+  (* print_endline "-------------- SLEEK MAIN ----------------"; *)
+  (* Hiphop.Sleek.main (); *)
+  (* print_endline "--------------- HIP MAIN -----------------"; *)
   test ()
 
 

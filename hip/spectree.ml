@@ -12,7 +12,7 @@ type bin_operator = Plus | Minus | Mult
 
 type logical_exp = Pvar of program_var 
                  | Lvar of logical_var 
-                 | Fun of logical_fun * (logical_exp list)
+                 (* | Fun of logical_fun * (logical_exp list) *)
                  | Const of constant
                  | Op of bin_operator * logical_exp * logical_exp
 
@@ -25,9 +25,10 @@ type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
               | Neg of pure_pred
               | True | False
 
+type pred = pure_pred
 
 type pred_normal_form = {
-  pure: ( pure_pred) list; 
+  pure: pred list; 
   (* disjunctive normal form of pure formulas *)
   spec: fun_signature list;
 } 
@@ -42,18 +43,10 @@ and fun_signature = {
 
 type exp_type = Int
 
-type pred_type = Func of exp_type list | Prop of exp_type list
-
-type logical_function = {
-  pname: logical_fun;
-  pargs: (logical_var * exp_type) list;
-  pbody: logical_exp;
-}
-
 type logical_proposition = {
   pname: logical_fun;
   pargs: (logical_var * exp_type) list;
-  pbody: pure_pred list;
+  pbody: pred list; (* disjunctive normal form *)
 }
 
 
@@ -83,7 +76,7 @@ let rec thin_pred = function
 let rec logical_exp_to_string = function
 | Pvar v -> v
 | Lvar v -> v
-| Fun (v, vs) -> String.concat "" ([v;"("] @ [(String.concat "," (List.map logical_exp_to_string vs))] @ [")"] )
+(* | Fun (v, vs) -> String.concat "" ([v;"("] @ [(String.concat "," (List.map logical_exp_to_string vs))] @ [")"] ) *)
 | Const (Int i) -> string_of_int i
 | Op (oper, t1, t2) ->
     let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" in
@@ -103,7 +96,7 @@ match p with
 | Neg p1 ->
   String.concat "" ["~"; pure_pred_to_string p1]
 | Prop (p, xs) ->
-    String.concat "" ([p; "("] @ List.map logical_exp_to_string xs @ [")" ])
+    String.concat "" ([p; "(" ; String.concat "," (List.map logical_exp_to_string xs) ; ")" ])
 | True -> " true "
 | False -> " false "
 
@@ -135,7 +128,7 @@ let rec subst_logical_exp a b =
   let subst_str m = if String.equal m a then b else m in function
 | Pvar v -> Pvar (subst_str v)
 | Lvar v -> Lvar v
-| Fun (v, vs) -> Fun (subst_str v, List.map (subst_logical_exp a b) vs)
+(* | Fun (v, vs) -> Fun (subst_str v, List.map (subst_logical_exp a b) vs) *)
 | Const (Int i) -> Const (Int i)
 | Op (oper, t1, t2) -> Op (oper, subst_logical_exp a b t1, subst_logical_exp a b t2)
 
@@ -172,14 +165,15 @@ let rec subst_pred_normal_form a b pnf = {
  } 
 
 and subst_fun_signature a b fsig = 
+  if String.equal fsig.fname a then fsig else
   { fsig with (* TODO: subst pnames? *)
               fpre= subst_pred_normal_form a b fsig.fpre;
               fpost= (* TODO: alpha renaming *)
                 (match fsig.fpost with
                 anchor, fpost -> (if String.equal a anchor then b else anchor), 
-                                  subst_pred_normal_form a b fpost );
-              fname = if String.equal a fsig.fname then b else a }
-
+                                  subst_pred_normal_form a b fpost );}
+              (* fname = if String.equal a fsig.fname then b else a } *)
+(* fname works as a binder and therefore needs not substitution *)
 
 (* replace ax in p by bx *)
 let rec subst_fun_signatures ax bx p =
@@ -213,9 +207,9 @@ let rec fvars_of_expr e fvars : VarSet.t =
   let module VS = VarSet in match e with
   | Pvar v -> VS.add v fvars
   | Lvar v -> VS.add v fvars
-  | Fun (_, vs) -> 
+  (* | Fun (_, vs) -> 
       (* let fvars1 = VS.add v fvars in *)
-      List.fold_right (fvars_of_expr) vs fvars
+      List.fold_right (fvars_of_expr) vs fvars *)
   | Const _ -> fvars
   | Op (_, t1, t2) -> 
       List.fold_right (fvars_of_expr) [t1; t2] fvars
@@ -238,7 +232,7 @@ let rec fvars_of_pure p fvars : VarSet.t =
 
 let rec fname_of_expr e fvars : VarSet.t = 
   let module VS = VarSet in match e with
-  | Fun (v, _) -> VS.add v fvars
+  (* | Fun (v, _) -> VS.add v fvars *)
   | Op (_, t1, t2) -> 
         List.fold_right (fname_of_expr) [t1; t2] fvars
   | _ -> fvars (* variables *)
@@ -278,3 +272,65 @@ let preds_and_pred (preds: pure_pred list) pred =
 (*   Requires      f(a) |= { true } *->:r { r=fpure(a) }
      Ensures[res]  res=fpure(fpure(a))
 *)
+
+
+
+module SMap = Map.Make (struct
+type t = string
+let compare = compare
+end)
+
+module SSet = Set.Make(String)
+
+type env = {
+(* module name -> a bunch of function specs *)
+specs : fun_signature list SMap.t;
+
+res_index : int ref;
+
+predicates : logical_proposition list;
+
+fname_assignment: logical_proposition SMap.t;
+(* when simple SMT solving fails,
+   try to find a proper fname assignment
+   
+   what about when fname are composed?
+
+   Proposed strategy
+
+   1. same
+   2. try fnames in the context (uninterpreted)
+   (* do we really need this feature? *)
+   3. try concrete abstractions (interpreted)
+   
+   *)
+(* fnames : SSet.t; *)
+}
+
+
+module Env = struct
+let empty = {
+  specs = SMap.empty;
+  res_index = ref 0;
+  predicates = [];
+  fname_assignment = SMap.empty;
+}
+
+let add_fn fname specs env =
+  { env with specs = SMap.add fname specs env.specs; }
+
+let add_spec_to_fn fname spec env = 
+  { env with specs = SMap.update fname (function None -> Some [spec]
+                              | Some specs -> Some (spec::specs)) env.specs }
+
+let find_spec fname env = SMap.find_opt fname env.specs
+
+let get_fresh_res_name env = env.res_index := !(env.res_index) + 1; "_r" ^ string_of_int !(env.res_index)
+
+let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
+
+let available_names env = List.map fst (SMap.bindings (env.specs))
+
+end
+
+

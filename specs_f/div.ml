@@ -46,16 +46,7 @@ let div_by_one_sig = {
     }]};
 }
 
-let div_by_one'_sig = {
-  fname="div_by_one'";
-  fvar=["x"];
-  pnames=[];
-  fpre={
-    pure=[(True)];
-    spec=[]
-  };
-  fpost="m", {pure=[(Arith (Eq, Pvar "m", Pvar "x"))];spec=[]}
-}
+
 
 let twice_sig = {
   fname="twice";
@@ -67,16 +58,10 @@ let twice_sig = {
       fvar=["a"];
       pnames=[];
         fpre={pure=[(True)]; spec=[]};
-        fpost="res0", {pure=[(Prop ("fpure", [Pvar "a"; Pvar "res0"]))]; spec=[]}
+        fpost="res0", {pure=[(Arith (Eq, Pvar "res0", Fun ("fpure", [Pvar "a"])))]; spec=[]}
     }
   ]};
-  fpost="res", {pure=[(And (
-        (And (Prop ("fpure", [Pvar "x"; Pvar "r"]),
-                            Prop ("fpure", [Pvar "r"; Pvar "res"])))
-                            ,
-              (* Prop ("fpure", [Pvar "x"; Pvar "res"])) *)
-                          True)
-                            )]; spec=[]};
+  fpost="res", {pure=[(Arith (Eq, Pvar "res", (Fun ("fpure", [ Fun ("fpure", [Pvar "x"]) ] ))))]; spec=[]};
 }
 
 
@@ -98,17 +83,4 @@ let sigs = [
   div_by_one_sig;
   twice_sig;
   div_by_one_star_sig;
-  div_by_one'_sig ;
-]
-
-let div_one_pure = {
-  pname="div_one";
-  pargs=[("x", Int); ("r", Int)];
-  pbody=[
-    Arith (Eq, Pvar "x", Pvar "r")
-  ]; (* disjunctive normal form *)
-}
-
-let predicates = [
-  div_one_pure;
 ]

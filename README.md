@@ -2,6 +2,9 @@
 
 ## TODO list
 
+- subsumption check
+  - what about a nested function specification?
+    - example of div_by_one
 - general specification
   - first implemented as user declared, then find ways to automate it
   > prefer with explicit instantiation, because it fits the design of user-defined predicate

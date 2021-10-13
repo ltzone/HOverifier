@@ -13,45 +13,6 @@ let rec input_lines file =
   | [line] -> (String.trim line) :: input_lines file
   | _ -> failwith "Weird input_line return value"
 
-module SMap = Map.Make (struct
-  type t = string
-  let compare = compare
-end)
-
-module SSet = Set.Make(String)
-
-type env = {
-  (* module name -> a bunch of function specs *)
-  specs : fun_signature list SMap.t;
-
-  res_index : int ref;
-  (* fnames : SSet.t; *)
-}
-
-
-module Env = struct
-  let empty = {
-    specs = SMap.empty;
-    res_index = ref 0;
-  }
-
-  let add_fn fname specs env =
-    { env with specs = SMap.add fname specs env.specs; }
-  
-  let add_spec_to_fn fname spec env = 
-    { env with specs = SMap.update fname (function None -> Some [spec]
-                                | Some specs -> Some (spec::specs)) env.specs }
-
-  let find_spec fname env = SMap.find_opt fname env.specs
-
-  let get_fresh_res_name env = env.res_index := !(env.res_index) + 1; "_r" ^ string_of_int !(env.res_index)
-
-  let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
-
-  let available_names env = List.map fst (SMap.bindings (env.specs))
-
-end
-
 
 let string_of_pattern :Parsetree.pattern_desc -> string = function
 | Ppat_var v -> v.txt
@@ -97,17 +58,51 @@ let rec split_nth (n:int) prev xs =
 
 ;; *)
 
+let findi_opt f xs =
+  let rec findi_opt_aux n = function
+  | y::ys -> if (f y) then Some n else findi_opt_aux (n+1) ys
+  | [] -> None in
+  findi_opt_aux 0 xs
+
+
+let check_fun env args fvars spec_to_check pre : bool =
+  let find_spec_name fname =
+    findi_opt (String.equal fname) fvars in
+  let check_single_fun_spec spec =
+    match (find_spec_name spec.fname) with
+    | None -> failwith ("The specification declared as " ^ spec.fname ^ " is not part of the argument list")
+    | Some i ->
+        let fun_name_in_env = List.nth args i in
+        let client_spec = Env.find_spec fun_name_in_env env in
+        match client_spec with
+        (* TODO: try multiple specifications *)
+          | Some (client_spec :: _) -> Sleek.check_spec_sub pre client_spec spec
+          | _ -> failwith ("No specification found for function " ^ fun_name_in_env)
+    in
+  List.fold_right (
+    fun spec bres -> if bres 
+        then (bres && (check_single_fun_spec spec)) 
+        else false) spec_to_check true
+
+
   (* TODO: first check partial/full application, then check pre-post SMT *)
 let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * pred_normal_form) option =
 (* let spec_to_check = spec.fspec.fpre.spec in *)
 (* let check_env = check_spec env spec_to_check in *)
 (* if check_bool && check_env then  *)
-  (if List.length args = List.length spec.fvar then
-    let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
-  let pure_to_check = subst_pre_to_check.pure in
+  if List.length args = List.length spec.fvar then
+    (* full application *)
+    (let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
+    let pure_to_check = subst_pre_to_check.pure in
+    let spec_to_check = subst_pre_to_check.spec in
+    (* print_endline "00000000000000";
+    (* List.iter (fun v -> print_endline v) args; *)
+    List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
+    (* List.iter (fun v -> print_endline (string_of_fun_spec v)) spec.fpre.spec; *)
+    print_endline "00000000000000"; *)
+  let check_env = check_fun env args spec.fvar spec_to_check pure_to_check  in
   let check_bool = Sleek.check_pure (pre_cond) (pure_to_check) in
-    if check_bool then
-      (* full application *)
+    if check_bool && check_env then
       (let new_anchor = Env.get_fresh_res_name env in
       Some (new_anchor, {
         pure= List.concat_map (fun (preds) -> (
@@ -129,7 +124,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
         spec= []
         }))
         
-  else None
+    else None)
   else 
     (* partial application *)
     let new_name = spec.fname^"'" in
@@ -145,7 +140,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
         fpre=subst_pred_normal_forms applied_args args spec.fpre;
         fpost=(fst  spec.fpost, subst_pred_normal_forms applied_args args (snd spec.fpost));
       }]
-    }))
+    })
 
 let add_constraint (acc: pred_normal_form) (pred: pure_pred) : pred_normal_form =
   { acc with pure= List.map (fun preds -> And (pred, preds)) (acc.pure) }

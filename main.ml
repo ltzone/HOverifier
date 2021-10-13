@@ -1,6 +1,11 @@
-let make_sig sigs =
+let make_sig sigs predicates pty_env =
   let open Hiphop in
-  List.fold_right (fun (si:Spectree.fun_signature) -> Spectree.Env.add_spec_to_fn si.fname si ) sigs Spectree.Env.empty
+  let with_sig =
+  List.fold_right (fun (si:Spectree.fun_signature) -> Spectree.Env.add_spec_to_fn si.fname si ) sigs Spectree.Env.empty in
+  { with_sig with
+      predicates = predicates;
+      ftype_context = pty_env;
+  }
 
 (* let double_env = 
   let open Specs.Double in
@@ -8,7 +13,7 @@ let make_sig sigs =
 
 let div_env = 
   let open Specs.Div in
-  make_sig sigs
+  make_sig sigs predicates pty_env
 
 (* let trivial_env = 
   let open Specs.Trivial in

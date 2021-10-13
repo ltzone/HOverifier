@@ -8,6 +8,7 @@
 - general specification
   - first implemented as user declared, then find ways to automate it
   > prefer with explicit instantiation, because it fits the design of user-defined predicate
+  - implemented by adding an extra constraint to the solver
 - if structure
 - ADT, match structure
 - refine the disjunctive normal form reasoning
@@ -15,6 +16,8 @@
 - introduce separation logic
 - Assertion parser
 
+- discriminate between pvar and lvar in substitution
+- alpha renaming everywhere (e.g. div.ml)
 
 ## Discussion
 

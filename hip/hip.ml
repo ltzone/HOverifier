@@ -65,7 +65,7 @@ let findi_opt f xs =
   findi_opt_aux 0 xs
 
 
-let check_fun env args fvars spec_to_check pre : bool =
+let check_fun env args fvars spec_to_check pre : spec_res * env =
   let find_spec_name fname =
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =
@@ -76,13 +76,16 @@ let check_fun env args fvars spec_to_check pre : bool =
         let client_spec = Env.find_spec fun_name_in_env env in
         match client_spec with
         (* TODO: try multiple specifications *)
-          | Some (client_spec :: _) -> Sleek.check_spec_sub pre client_spec spec
+          | Some (client_spec :: _) -> Sleek.check_spec_sub env pre client_spec spec
           | _ -> failwith ("No specification found for function " ^ fun_name_in_env)
     in
-  List.fold_right (
-    fun spec bres -> if bres 
-        then (bres && (check_single_fun_spec spec)) 
-        else false) spec_to_check true
+    (* print_endline ("Spec to check:::::" ^ string_of_int (List.length spec_to_check)); *)
+  let res = List.fold_right (
+    fun spec (bres, (env:env)) -> match bres with Fail -> Fail, env
+        | _ -> (match (check_single_fun_spec spec) with
+          | Fail -> Fail, env
+          | Inst vs -> (Inst vs, List.fold_right (fun v env -> Env.add_inst env (fst v) (snd v)) vs env)
+          | Success -> Success, env )  (* TODO: mark the instantiated? *)) spec_to_check (Success, env) in res
 
 
   (* TODO: first check partial/full application, then check pre-post SMT *)
@@ -100,16 +103,20 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
     List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
     (* List.iter (fun v -> print_endline (string_of_fun_spec v)) spec.fpre.spec; *)
     print_endline "00000000000000"; *)
-  let check_env = check_fun env args spec.fvar spec_to_check pure_to_check  in
+  let check_env, env = check_fun env args spec.fvar spec_to_check pure_to_check  in
   let check_bool = Sleek.check_pure (pre_cond) (pure_to_check) in
-    if check_bool && check_env then
+    if (check_bool) then
+      match check_env with
+      | Fail -> None 
+      | _ ->
       (let new_anchor = Env.get_fresh_res_name env in
       Some (new_anchor, {
         pure= List.concat_map (fun (preds) -> (
           let fpost_anchor, fpost_dnf = spec.fpost in
           let fpost_ass = preds_and_pred fpost_dnf.pure preds in
           let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
-          let conj_res = preds_and_pred post_subst preds in
+          let post_subst_env = instantiate_pure_preds env post_subst in
+          let conj_res = preds_and_pred post_subst_env preds in
           let subst_res = subst_pure_preds_list spec.fvar args conj_res in
           (* let subst_res = And (preds, post_subst) in *)
           (* print_endline "----------->";
@@ -220,6 +227,7 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
     | Some fspecs ->
     let valid_fspecs = List.filter_map 
       (check_spec_derive env acc.pure arg_vars) fspecs in
+    if (List.length valid_fspecs = 0) then failwith "No valid function spec available" else
     let unified_anchor = Env.get_fresh_res_name env in
     let combine_fspecs {pure=old_pure; spec=old_spec} (anchor, {pure; spec}) = 
       { pure= (List.map (fun (pure) -> (subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;

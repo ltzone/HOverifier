@@ -103,12 +103,16 @@ let sigs = [
 
 let div_one_pure = {
   pname="div_one";
-  pargs=[("x", Int); ("r", Int)];
+  pargs=[("q1", Int); ("q2", Int)];
   pbody=[
-    Arith (Eq, Pvar "x", Pvar "r")
+    (* Arith (Eq, Pvar "x", Pvar "r") *)
+    (* Should ensure no duplicate names *)
+    Arith (Eq, Pvar "q1", Pvar "q2")
   ]; (* disjunctive normal form *)
 }
 
 let predicates = [
   div_one_pure;
 ]
+
+let pty_env = SMap.empty |> SMap.add "fpure" [Int; Int]

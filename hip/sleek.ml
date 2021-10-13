@@ -4,6 +4,23 @@ open Spectree
 open Z3
 exception TestFailedException of string
 
+
+type prop_candidates = (fun_id * logical_proposition) list
+
+let list_diff a b =
+  let a_set = VarSet.of_list a in
+  let b_set = VarSet.of_list b in
+  let a_diff_b = VarSet.diff a_set b_set in
+  VarSet.elements a_diff_b
+
+let list_intersect a b =
+  let a_set = VarSet.of_list a in
+  let b_set = VarSet.of_list b in
+  let a_set_b = VarSet.inter a_set b_set in
+  VarSet.elements a_set_b
+
+  
+
 let forall_formula_of ctx xs formula =
   let xs = List.map (fun v -> 
       Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) xs in
@@ -100,6 +117,21 @@ let solver_wrapper ctx goal : bool =
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n ; false
 
+let encode_ty ctx = function
+ Int -> Arithmetic.Integer.mk_sort ctx
+
+let encode_arg ctx = function
+| (v, Int) -> Arithmetic.Integer.mk_const_s ctx v
+
+let logical_proposition_to_expr ctx fname {pargs; pbody; _} : Expr.expr =
+  let arg_list = List.map fst pargs in
+  let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
+  let var_list = List.map (encode_arg ctx) pargs in
+  let ex_vars = list_diff (VarSet.elements (fvars_of_pures pbody)) arg_list in
+  let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
+  forall_formula_of ctx arg_list 
+    (Boolean.mk_eq ctx (FuncDecl.apply fun_decl var_list) 
+      (exists_formula_of ctx ex_vars (pure_preds_to_expr ctx pbody)))
 
 
 (* 
@@ -124,24 +156,19 @@ z3 Cannot synthesize a fpure itself!
       Printf.printf "Model: \n%s\n" (Model.to_string m);
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; true *)
-        
-let solver_check_bool ctx goal =
+
+
+
+let solver_check_bool ctx goal (cand: prop_candidates) =
   let solver = (Solver.mk_simple_solver ctx) in
     let f e = 
       (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
     Solver.add solver [ Boolean.mk_not ctx e ] in
       ignore (List.map f (Goal.get_formulas goal)) ;
-    Solver.add solver [((forall_formula_of ctx ["w1";"w2"]
-    (Boolean.mk_eq  ctx ( FuncDecl.apply
-      (FuncDecl.mk_func_decl_s ctx "fpure" [
-        Arithmetic.Integer.mk_sort ctx;
-        Arithmetic.Integer.mk_sort ctx
-      ] (Boolean.mk_sort ctx))
-      [(Arithmetic.Integer.mk_const_s ctx "w1");
-      (Arithmetic.Integer.mk_const_s ctx "w2")]
-    ) (Boolean.mk_eq ctx (Arithmetic.Integer.mk_const_s ctx "w1")
-    (Arithmetic.Integer.mk_const_s ctx "w2")))
-  ))];
+    List.iter (fun (fname, fbody) -> 
+      print_endline (Expr.to_string (logical_proposition_to_expr ctx fname fbody));
+      Solver.add solver
+      [logical_proposition_to_expr ctx fname fbody]) cand;
     let q = (Solver.check solver []) in
       if q != SATISFIABLE then true
       else
@@ -182,18 +209,19 @@ let rename_fun_args fun1 fun2 =
       subst_pred_normal_forms (fun2.fvar) (fun1.fvar) subst_ret)
   }
 
-let list_diff a b =
-  let a_set = VarSet.of_list a in
-  let b_set = VarSet.of_list b in
-  let a_diff_b = VarSet.diff a_set b_set in
-  VarSet.elements a_diff_b
 
-type spec_res = 
-| Fail
-| Success
-| Inst of logical_proposition
+let make_prop_candidates env (fnames: (fun_id * exp_type list) list) :
+  (fun_id * logical_proposition) list list =
+  let check_sig_match arg cand_arg = 
+      List.length arg = List.length cand_arg in
+  let find_match_prop fname =
+    List.filter (fun v -> check_sig_match fname (v.pargs)) env.predicates in
+  List.map 
+    (fun (fname, fargs) -> 
+      (List.map (fun v -> (fname, v)) (find_match_prop fargs))) fnames
 
-let check_spec_sub (pre: pure_pred list) fun1 fun2 : bool = 
+
+let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res = 
 (* For client signature GIVEN Z1, pre1 *-> exist x.post1
    and server signature GIVEN Z2, pre2 *-> exist y.post2
    fun1 <: fun2 should be encoded into
@@ -211,7 +239,7 @@ let check_spec_sub (pre: pure_pred list) fun1 fun2 : bool =
   print_endline ("[client] " ^ string_of_fun_spec fun1);
   print_endline ("[server] " ^ string_of_fun_spec fun2);
 
-
+(* Step 1: translate to Z3 expression *)
   let fun2 = rename_fun_args fun1 fun2 in
   (* fun1 is also associated with pre, so we rename fun2 *)
 
@@ -220,6 +248,9 @@ let check_spec_sub (pre: pure_pred list) fun1 fun2 : bool =
   let arg_all = fun1.fvar in
   let spec1_all = list_diff spec1_all arg_all in
   let spec2_all = list_diff spec2_all arg_all in
+  let shared_ex = list_intersect spec1_ex spec2_ex in
+  let spec1_ex = list_diff spec1_ex shared_ex in
+  let spec2_ex = list_diff spec2_ex shared_ex in
 
   let cfg = [("model", "true"); ("proof", "true")] in
   let ctx = (mk_context cfg) in
@@ -232,9 +263,10 @@ let check_spec_sub (pre: pure_pred list) fun1 fun2 : bool =
   let impl_formula_lhs = Boolean.mk_and ctx [pre_formula; pre1_formula] in
   let impl_formula_rhs = Boolean.mk_and ctx [
       pre2_formula;
-      Boolean.mk_implies ctx
-        (exists_formula_of ctx spec2_ex post2_formula)
-        (exists_formula_of ctx spec1_ex post1_formula)
+      forall_formula_of ctx shared_ex
+        (Boolean.mk_implies ctx
+          (exists_formula_of ctx spec2_ex post2_formula)
+          (exists_formula_of ctx spec1_ex post1_formula))
   ] in
   let quanti_rhs = exists_formula_of ctx spec2_all impl_formula_rhs in
   let impl_formula = Boolean.mk_implies ctx impl_formula_lhs quanti_rhs in
@@ -245,10 +277,35 @@ let check_spec_sub (pre: pure_pred list) fun1 fun2 : bool =
   Goal.add goal [quanti_formula];
   print_endline (Expr.to_string (quanti_formula));
   (* let quantified_formula = Quantifier.mk_forall_const ctx  in *)
-  let res = solver_check_bool ctx goal in
   (* print_endline "finished checking";  *)
-  res
-
+  
+(* Step 2: try high level verification *)
+  let ho_verif = solver_check_bool ctx goal [] in
+  if ho_verif then (Success) else
+(
+(* Step 3: try instantiate from user-defined predicates *)
+  let fname_to_instantiate = 
+    VarSet.elements
+      (VarSet.union (fname_of_pures fun2.fpre.pure)
+      (fname_of_pures (snd fun2.fpost).pure)) in
+  let fname_sig_to_inst = List.map (Env.lookup_ftype env) fname_to_instantiate in
+  (* print_endline (pure_preds_to_string (snd fun2.fpost).pure);
+  print_endline (string_of_int (List.length fname_sig_to_inst)); *)
+  let candidates = make_prop_candidates env fname_sig_to_inst in
+  (* print_endline (string_of_int (List.length candidates)); *)
+  (* let post_fname = fname_of_pure post VarSet.empty in *)
+  (* let fname_to_instantiate = VarSet.diff pre_fname post_fname in *)
+  let res =
+    List.fold_left (fun last_res candidate -> 
+      match last_res with
+    | Fail -> if solver_check_bool ctx goal candidate then Inst candidate else Fail
+    | Success -> Success
+    | Inst v -> 
+      (* List.iter (fun v -> print_endline (logical_proposition_to_string (snd v))) v;  *)
+      Inst v ) Fail candidates in
+  (* print_endline (match res with | Fail -> "return value is false"; | _ -> "return value is success"); *)
+   res
+)
 
 let check_pure (pre: pure_pred list) (post:pure_pred list) : bool = 
   print_endline "sleek: checking for pre and post";
@@ -268,9 +325,7 @@ let check_pure (pre: pure_pred list) (post:pure_pred list) : bool =
   let post_formula = (pure_preds_to_expr ctx post) in
 
 
-  (* let pre_fname = fname_of_pure pre VarSet.empty in *)
-  (* let post_fname = fname_of_pure post VarSet.empty in *)
-  (* let fname_to_instantiate = VarSet.diff pre_fname post_fname in *)
+
   (* print_endline ("sleek: need to instantiate: " ^ String.concat "," (VarSet.elements fname_to_instantiate) ); *)
 
 
@@ -297,7 +352,7 @@ let check_pure (pre: pure_pred list) (post:pure_pred list) : bool =
   Goal.add goal [impl_formula];
   (* print_endline (Expr.to_string (impl_formula)); *)
   (* let quantified_formula = Quantifier.mk_forall_const ctx  in *)
-  let res = solver_check_bool ctx goal in
+  let res = solver_check_bool ctx goal [] in
   (* print_endline "finished checking";  *)
   res
 

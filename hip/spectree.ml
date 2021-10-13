@@ -4,24 +4,29 @@ type logical_var = string
 
 type program_var = string
 
-type logical_fun = string
 
 type constant = Int of int
 
 type bin_operator = Plus | Minus | Mult
 
 type logical_exp = Pvar of program_var 
-                 | Lvar of logical_var 
-                 (* | Fun of logical_fun * (logical_exp list) *)
-                 | Const of constant
-                 | Op of bin_operator * logical_exp * logical_exp
+| Lvar of logical_var 
+(* | Fun of logical_fun * (logical_exp list) *)
+| Const of constant
+| Op of bin_operator * logical_exp * logical_exp
 
+
+type exp_type = Int
+
+type fun_id = string
+
+type logical_fun = fun_id * (logical_var * exp_type) list
 
 type arith_pred_oper = Eq | Le
 
 type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
               | And of pure_pred * pure_pred
-              | Prop of logical_fun * (logical_exp list)
+              | Prop of fun_id * (logical_exp list)
               | Neg of pure_pred
               | True | False
 
@@ -34,21 +39,25 @@ type pred_normal_form = {
 } 
 and fun_signature = {
   fname: program_var;
-  pnames: logical_fun list; (* can only occurs on top level *)
+  pnames: fun_id list; (* can only occurs on top level *)
   fvar: program_var list;
   fpre: pred_normal_form;
   fpost: program_var * pred_normal_form;
 }
 (* basic term *)
 
-type exp_type = Int
 
 type logical_proposition = {
-  pname: logical_fun;
+  pname: fun_id;
   pargs: (logical_var * exp_type) list;
   pbody: pred list; (* disjunctive normal form *)
 }
 
+
+type spec_res = 
+| Fail
+| Success
+| Inst of (fun_id * logical_proposition) list
 
 let rec thin_pred = function
 | Arith (oper, t1, t2) -> Arith (oper, t1, t2)
@@ -116,6 +125,14 @@ and string_of_fun_spec {fname; fvar; pnames; fpre; fpost} =
       string_of_pred_normal_form fpre ^ "} *->:" ^ fst fpost ^ " {"
       ^ string_of_pred_normal_form (snd fpost) ^"}"
 
+let string_of_ty = function
+| Int -> "int"
+
+let logical_proposition_to_string  {pname;  pargs;  pbody;} = 
+  String.concat ""
+  [pname; "("; String.concat "," (List.map (fun (v,t) -> v ^ ":" ^ string_of_ty t) pargs);
+      ") = {"; pure_preds_to_string pbody ;"}" ]
+
 
 (*******************************
 ********************************
@@ -144,6 +161,38 @@ let rec subst_pure_pred a b = function
 
 let subst_pure_pred_list a b preds =
   List.map (subst_pure_pred a b) preds 
+
+
+let rec fill_logical_exp a (b:logical_exp) = function
+| Pvar v -> if String.equal v a then b else Pvar v
+| Lvar v -> if String.equal v a then b else Lvar v
+(* | Fun (v, vs) -> Fun (subst_str v, List.map (subst_logical_exp a b) vs) *)
+| Const (Int i) -> Const (Int i)
+| Op (oper, t1, t2) -> Op (oper, fill_logical_exp a b t1, fill_logical_exp a b t2)
+
+
+let rec fill_pure_pred a b = function
+| Arith (oper, t1, t2) -> Arith (oper, (fill_logical_exp a b t1), (fill_logical_exp a b t2))
+| And (p1, p2) -> And ((fill_pure_pred a b p1), (fill_pure_pred a b p2))
+(* | Or (p1, p2) -> Or ((fill_logical_exp a b p1), (fill_logical_exp a b p2)) *)
+| Neg p1 -> Neg (fill_pure_pred a b p1)
+| Prop (p, xs) -> Prop (p, List.map (fill_logical_exp a b) xs)
+| True -> True
+| False -> False
+
+let fill_pure_pred_list a b preds =
+  List.map (fill_pure_pred a b) preds 
+  
+let rec fill_pure_preds ax bx p =
+match ax, bx with
+| a::ax', b::bx' -> 
+    let p' = fill_pure_pred a b p in
+    fill_pure_preds ax' bx' p'
+| [], [] -> p
+| _ -> failwith "Unmatched argument list in filling"
+
+let fill_pure_preds_list ax bx preds =
+  List.map (fill_pure_preds ax bx) preds 
 
 (* replace ax in p by bx *)
 let rec subst_pure_preds ax bx p =
@@ -291,6 +340,8 @@ res_index : int ref;
 predicates : logical_proposition list;
 
 fname_assignment: logical_proposition SMap.t;
+
+ftype_context: (exp_type list) SMap.t
 (* when simple SMT solving fails,
    try to find a proper fname assignment
    
@@ -314,7 +365,24 @@ let empty = {
   res_index = ref 0;
   predicates = [];
   fname_assignment = SMap.empty;
+  ftype_context = SMap.empty;
 }
+
+let lookup_ftype env fname =
+  match SMap.find_opt fname env.ftype_context with
+  | Some v -> fname, v
+  | None -> failwith ("Predicate type not found for " ^ fname)
+
+let add_inst env inst_name inst = 
+  match SMap.find_opt inst_name env.fname_assignment with
+  | Some _ -> failwith (inst_name ^ " is already in the specification, conflict")
+  | None ->
+    {
+      env with
+      fname_assignment= SMap.add inst_name inst env.fname_assignment;
+    }
+  
+
 
 let add_fn fname specs env =
   { env with specs = SMap.add fname specs env.specs; }
@@ -334,3 +402,27 @@ let available_names env = List.map fst (SMap.bindings (env.specs))
 end
 
 
+let instantiate_pure_preds env pure_preds =
+  if SMap.cardinal (env.fname_assignment) > 0 then
+    print_endline (logical_proposition_to_string (snd (List.nth (SMap.bindings env.fname_assignment) 0)))
+  else ();
+
+  let rec instantiate_pred fname assign pure_pred : pure_pred list =
+    match pure_pred with
+    | Arith (op, x1, x2) -> [ Arith (op, x1, x2) ]
+    | And (p1, p2) -> 
+        let p1_inst = instantiate_pred fname assign p1 in
+        let p2_inst = instantiate_pred fname assign p2 in
+        List.concat_map (fun v -> List.map (fun x -> And (v, x)) p1_inst) p2_inst 
+    | Prop (fn, es) ->
+        if String.equal fname fn
+          then fill_pure_preds_list (List.map fst (assign.pargs)) es (assign.pbody)
+        else  [ Prop (fn, es) ]
+    | Neg p -> instantiate_pred fname assign p
+    | True  -> [ True ]
+    | False -> [ False ] in
+
+  let instantiate_preds fname assign pure_preds : pure_pred list =
+    List.concat_map (instantiate_pred fname assign) pure_preds in
+  
+  SMap.fold (fun fname (ass:logical_proposition) pred -> instantiate_preds fname ass pred) env.fname_assignment pure_preds

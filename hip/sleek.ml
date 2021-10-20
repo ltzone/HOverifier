@@ -4,6 +4,13 @@ open Spectree
 open Z3
 exception TestFailedException of string
 
+let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
+
+let print_assignment_groups vs =
+  print_endline "[[[[[]]]]]";
+  List.iter (fun vs' ->
+    List.iter (fun (n, v) -> print_endline (n ^" : " ^ logical_proposition_to_string v)) vs';
+    print_endline "-----") vs;
 
 type prop_candidates = (fun_id * logical_proposition) list
 
@@ -213,12 +220,15 @@ let rename_fun_args fun1 fun2 =
 let make_prop_candidates env (fnames: (fun_id * exp_type list) list) :
   (fun_id * logical_proposition) list list =
   let check_sig_match arg cand_arg = 
+    (* TODO: add check type *)
       List.length arg = List.length cand_arg in
   let find_match_prop fname =
     List.filter (fun v -> check_sig_match fname (v.pargs)) env.predicates in
-  List.map 
-    (fun (fname, fargs) -> 
-      (List.map (fun v -> (fname, v)) (find_match_prop fargs))) fnames
+  let res = List.fold_left (fun (res: (fun_id * logical_proposition) list list) (fname, fargs) ->
+    let cur_candidates = (List.map (fun v -> (fname, v)) (find_match_prop fargs)) in
+      List.concat_map (fun v -> List.map (fun r -> (v::r)) res) cur_candidates
+  ) [[]] fnames in res
+
 
 
 let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res = 
@@ -292,19 +302,13 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
   (* print_endline (pure_preds_to_string (snd fun2.fpost).pure);
   print_endline (string_of_int (List.length fname_sig_to_inst)); *)
   let candidates = make_prop_candidates env fname_sig_to_inst in
+  print_assignment_groups candidates;
   (* print_endline (string_of_int (List.length candidates)); *)
   (* let post_fname = fname_of_pure post VarSet.empty in *)
   (* let fname_to_instantiate = VarSet.diff pre_fname post_fname in *)
-  let res =
-    List.fold_left (fun last_res candidate -> 
-      match last_res with
-    | Fail -> if solver_check_bool ctx goal candidate then Inst candidate else Fail
-    | Success -> Success
-    | Inst v -> 
-      (* List.iter (fun v -> print_endline (logical_proposition_to_string (snd v))) v;  *)
-      Inst v ) Fail candidates in
-  (* print_endline (match res with | Fail -> "return value is false"; | _ -> "return value is success"); *)
-   res
+  let feasible_candidates =
+    List.filter (solver_check_bool ctx goal) candidates in
+    Inst feasible_candidates
 )
 
 let check_pure (pre: pure_pred list) (post:pure_pred list) : bool = 

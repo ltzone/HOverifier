@@ -17,7 +17,6 @@ open Spectree
 
 
 
-
 let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
 
 let string_of_ident = Frontend.Longident.last
@@ -99,15 +98,35 @@ let check_fun env args fvars spec_to_check pre : spec_res * env =
     in
     (* print_endline ("Spec to check:::::" ^ string_of_int (List.length spec_to_check)); *)
   print_length (spec_to_check);
-  let res = List.fold_right (
-    fun spec (bres, (env:env)) -> match bres with Fail -> Fail, env
-        | _ -> (match (check_single_fun_spec spec) with
-          | Fail -> Fail, env
-          | Inst vs -> (Inst vs, List.fold_right (fun v env -> 
-            print_endline ("adding inst for " ^ fst v);
-            print_endline (logical_proposition_to_string (snd v));
-            Env.add_inst env (fst v) (snd v)) vs env)
-          | Success -> Success, env )  (* TODO: mark the instantiated? *)) spec_to_check (Success, env) in res
+  let merge_two_inst vs vs' = 
+    (* combine two fname assignments, if the assignment conflict, abort this pair *)
+    let merged_inst = List.concat_map (fun v -> List.map ((@) v) vs') vs in
+    let filter_fun assignment = 
+      let assignment_map = Some SMap.empty in
+      let mapped_res = 
+        List.fold_right (fun (name, prop) old_map -> 
+          match old_map with
+          | Some old_map ->
+            (match SMap.find_opt name old_map with
+            | None -> Some (SMap.add name prop old_map)
+            | Some {pname; _} ->
+                if String.equal pname prop.pname then Some old_map else None)
+          | None -> None
+        ) assignment assignment_map in
+      match mapped_res with None -> None | Some map -> Some (SMap.bindings map) in
+    List.filter_map filter_fun merged_inst in
+
+
+  let merged_spec_res = List.fold_right
+  (fun spec last_res -> match last_res with Fail -> Fail
+  | Success -> (check_single_fun_spec spec)
+  | Inst vs -> match check_single_fun_spec spec with
+    | Fail -> Fail
+    | Success -> Inst vs
+    | Inst vs' ->  (* TODO to be tested *)
+          Inst (merge_two_inst vs vs')) spec_to_check Success in
+  merged_spec_res, env
+
 
 
   (* TODO: first check partial/full application, then check pre-post SMT *)
@@ -134,14 +153,18 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
 
       match check_fun_status with
       | Fail -> None 
-      | _ ->
+      | check_fun_status ->
+      let envs = match check_fun_status with
+      | Inst vs -> 
+        List.map (Env.add_inst_group env) vs
+      | _ -> [ env ] in
       (let new_anchor = Env.get_fresh_res_name env in
       Some (new_anchor, {
-        pure= List.concat_map (fun (preds) -> (
+        pure= List.concat_map (fun env -> List.concat_map (fun (preds) -> (
           let fpost_anchor, fpost_dnf = spec.fpost in
           let fpost_ass = preds_and_pred fpost_dnf.pure preds in
           let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
-          let post_subst_env = instantiate_pure_preds env post_subst in
+          let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
           let conj_res = preds_and_pred post_subst_env preds in
           let subst_res = subst_pure_preds_list spec.fvar args conj_res in
           (* let subst_res = And (preds, post_subst) in *)
@@ -153,7 +176,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
           print_endline (pure_pred_to_string subst_res);
           print_endline "<-----------"; *)
           subst_res)
-        ) pre_cond ;
+        ) pre_cond) envs;
         spec= []
         }))
         

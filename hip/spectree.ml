@@ -57,7 +57,7 @@ type logical_proposition = {
 type spec_res = 
 | Fail
 | Success
-| Inst of (fun_id * logical_proposition) list
+| Inst of ((fun_id * logical_proposition) list) list
 
 let rec thin_pred = function
 | Arith (oper, t1, t2) -> Arith (oper, t1, t2)
@@ -351,9 +351,11 @@ res_index : int ref;
 predicates : logical_proposition list;
 
 fname_assignment: (logical_proposition) SMap.t;
-(* Keep track of the possible list fname assignments in the context
+(* ~~Keep track of the possible list fname assignments in the context
    If one forward verifiaction process fails,
-   the assignment should be removed
+   the assignment should be removed~~
+
+   The current assignment of fnames, no duplicate
 *)
 
 ftype_context: (exp_type list) SMap.t
@@ -390,23 +392,20 @@ let lookup_ftype env fname =
 
 let add_inst env inst_name inst = 
   match SMap.find_opt inst_name env.fname_assignment with
-  | Some ass -> 
-      {
-        env with
-        fname_assignment= SMap.add inst_name (inst::ass) env.fname_assignment;
-      }
+  | Some ass -> failwith (inst_name ^ " is already instantiated as " ^ logical_proposition_to_string ass)
   | None ->
     {
       env with
-      fname_assignment= SMap.add inst_name [inst] env.fname_assignment;
+      fname_assignment= SMap.add inst_name inst env.fname_assignment;
     }
+let add_inst_group env (insts: (fun_id * logical_proposition) list) = 
+  List.fold_right (fun (inst_name, inst) env -> add_inst env inst_name inst) insts env
   
 let print_all_insts env =
   let insts = env.fname_assignment in
   List.iter (fun (name, name_insts) ->
-    print_endline (name ^ ": ");
-    List.iter (fun inst ->
-      print_endline (logical_proposition_to_string inst)) name_insts;
+    print_string (name ^ ": ");
+    print_endline (logical_proposition_to_string name_insts)
   )  (SMap.bindings insts)
 
 
@@ -416,6 +415,7 @@ let add_fn fname specs env =
 let add_spec_to_fn fname spec env = 
   { env with specs = SMap.update fname (function None -> Some [spec]
                               | Some specs -> Some (spec::specs)) env.specs }
+
 
 let find_spec fname env = SMap.find_opt fname env.specs
 

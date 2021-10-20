@@ -43,3 +43,10 @@ SMT encoding:
 
 ## If branching
 
+
+
+## Issues
+
+- Will we use the same abstract predicate to characterize two function parameters?
+  `let foo f g x = ... { Requires f |= fpure,... g |= fpure }`
+  [has implemented, to be tested]

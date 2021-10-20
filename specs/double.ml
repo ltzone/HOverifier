@@ -173,7 +173,7 @@ let double_pure = {
 }
 
 let predicates = [
-  (* incr_pure; *)
+  incr_pure;
   double_pure;
 ]
 

@@ -61,3 +61,9 @@ let sigs = [
   once_sig;
   two_arg_sig; (* TODO: library *)
 ]
+
+let predicates = [
+  
+]
+
+let pty_env = SMap.empty

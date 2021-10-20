@@ -350,7 +350,11 @@ res_index : int ref;
 
 predicates : logical_proposition list;
 
-fname_assignment: logical_proposition SMap.t;
+fname_assignment: (logical_proposition) SMap.t;
+(* Keep track of the possible list fname assignments in the context
+   If one forward verifiaction process fails,
+   the assignment should be removed
+*)
 
 ftype_context: (exp_type list) SMap.t
 (* when simple SMT solving fails,
@@ -386,14 +390,24 @@ let lookup_ftype env fname =
 
 let add_inst env inst_name inst = 
   match SMap.find_opt inst_name env.fname_assignment with
-  | Some _ -> 
-      failwith (inst_name ^ " is already in the specification, conflict")
+  | Some ass -> 
+      {
+        env with
+        fname_assignment= SMap.add inst_name (inst::ass) env.fname_assignment;
+      }
   | None ->
     {
       env with
-      fname_assignment= SMap.add inst_name inst env.fname_assignment;
+      fname_assignment= SMap.add inst_name [inst] env.fname_assignment;
     }
   
+let print_all_insts env =
+  let insts = env.fname_assignment in
+  List.iter (fun (name, name_insts) ->
+    print_endline (name ^ ": ");
+    List.iter (fun inst ->
+      print_endline (logical_proposition_to_string inst)) name_insts;
+  )  (SMap.bindings insts)
 
 
 let add_fn fname specs env =
@@ -414,9 +428,11 @@ let available_names env = List.map fst (SMap.bindings (env.specs))
 end
 
 
-let instantiate_pure_preds env pure_preds =
-  if SMap.cardinal (env.fname_assignment) > 0 then
-    print_endline (logical_proposition_to_string (snd (List.nth (SMap.bindings env.fname_assignment) 0)))
+
+
+let instantiate_pure_preds fname_assignment pure_preds =
+  if List.length (fname_assignment) > 0 then
+    print_endline (logical_proposition_to_string (snd (List.nth ( fname_assignment) 0)))
   else ();
 
   let rec instantiate_pred fname assign pure_pred : pure_pred list =
@@ -437,4 +453,4 @@ let instantiate_pure_preds env pure_preds =
   let instantiate_preds fname assign pure_preds : pure_pred list =
     List.concat_map (instantiate_pred fname assign) pure_preds in
   
-  SMap.fold (fun fname (ass:logical_proposition) pred -> instantiate_preds fname ass pred) env.fname_assignment pure_preds
+  List.fold_right (fun (fname, (ass:logical_proposition)) pred -> instantiate_preds fname ass pred) fname_assignment pure_preds

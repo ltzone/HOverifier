@@ -17,9 +17,9 @@ let three_add x y z = x + y + z
    
 
 
-(* let quad_fo x = (((+) x) (x) + ((+) x x))
+let quad_fo x = (((+) x) (x) + ((+) x x))
 (* Requires      { true }
-   Ensures[res]  { res = x + x + x + x } *) *)
+   Ensures[res]  { res = x + x + x + x } *)
       
 
 
@@ -35,7 +35,7 @@ let twice f x = f (f x)
 
 
 (* fpure = \x. x+1 *)
-(* let incr_once x = once incr x *)
+let incr_once x = once incr x
 (* Requires    true
    Ensures[r]  r = x + 1
 *)
@@ -67,7 +67,7 @@ REMARK: No matter how we choose to instantiate the fpure, it seems that
 
 
 
-(* let incr_twice x = twice incr x *)
+let incr_twice x = twice incr x
 (* Requires    true
    Ensures[r]  r = x + 2
 *)

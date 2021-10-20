@@ -5,6 +5,19 @@ module Printast = Frontend.Printast
 module Parsetree = Frontend.Parsetree
 open Spectree
 
+(* let rec repeat_try f env (candidates:'a)  =
+  List.fold_right
+  (fun candidate last_res ->
+    let last_flag, last_env = last_res in
+    if last_flag then
+      (let this_env, this_flag = f last_env candidate in
+        this_flag, this_env)
+    else false, env
+    ) candidates *)
+
+
+
+
 let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
 
 let string_of_ident = Frontend.Longident.last
@@ -69,9 +82,9 @@ let findi_opt f xs =
 
 let check_fun env args fvars spec_to_check pre : spec_res * env =
   let find_spec_name fname =
-    print_endline ("11111111111");
+    (* print_endline ("11111111111");
     print_endline (String.concat "," fvars);
-    print_endline (String.concat "," args);
+    print_endline (String.concat "," args); *)
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =
     match (find_spec_name spec.fname) with
@@ -107,15 +120,19 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
     (let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
     let pure_to_check = subst_pre_to_check.pure in
     let spec_to_check = subst_pre_to_check.spec in
-    (* print_endline "00000000000000";
-    (* List.iter (fun v -> print_endline v) args; *)
-    List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
-    (* List.iter (fun v -> print_endline (string_of_fun_spec v)) spec.fpre.spec; *)
-    print_endline "00000000000000"; *)
-  let check_env, env = check_fun env args spec.fvar spec_to_check pure_to_check  in
+
+
+  let check_fun_status, env = check_fun env args spec.fvar spec_to_check pure_to_check  in
   let check_bool = Sleek.check_pure (pre_cond) (pure_to_check) in
     if (check_bool) then
-      match check_env with
+(*       
+      (* Print inst predicates in the env *)
+      let () = match check_env with
+      | Inst vs -> 
+        print_endline (String.concat "\n" (List.map (fun (n, v) -> n ^ " : " ^ (logical_proposition_to_string v)) vs));
+      | _ -> () in *)
+
+      match check_fun_status with
       | Fail -> None 
       | _ ->
       (let new_anchor = Env.get_fresh_res_name env in

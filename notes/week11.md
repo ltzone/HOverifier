@@ -60,3 +60,48 @@ SMT encoding:
         _r27(x)[fpure_twice]|= { true  with 
         f(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}} *->:res {(fpure_twice(x,n) /\ fpure_twice(n,res))}
 ```
+
+
+## Resolve partial application
+
+```OCaml
+let quad x = twice double x
+(* verified, check `double <: twice.f`
+*)
+
+
+
+let quad x = (twice double) x
+(* Requires      { true }
+   Ensures[res]  { res = x + x + x + x } *)
+```
+
+
+- Step 1
+  - eval `(twice double):r`, we get the new assertion by adding an extra function specification available for the return value `r`
+  - In the original specification of twice, the first argument will be replaced with the [double]
+   ```
+   true  & 
+   r(x)|= { true  & double(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}} 
+       *->:res {(fpure_twice(x,n) /\ fpure_twice(n,res))}
+   ```
+
+- Step 2
+  - The forward verifier will take out the new specification of [r] and put into the context
+
+- Step 3 
+  - Next we evaluate [r x] (which is a full application)
+  - To validate the precondition of specification [r(x)]
+  - We need to validate `double(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}}`
+
+  - Recall that previously in a full application, (e.g. `let baz = bar foo c d`)
+    - `foo` will correspond to the first argument in `bar`, therefore we only need to verify `foo <: bar.f`
+
+  - but here, when we try to validate `double(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}}`,
+  - we can't search for a corresponding function in the argument list
+  - in fact, what we really want to verify is that
+    `double (defined in an other place in the program) <: {true} *->:res0 {fpure_twice(a,res0)}`
+
+- The two styles are essentially generating the same VC, the only difference is that
+  - for full application, we check the subsumption when do the application
+  - for partial application, we first do the substitution and postpone the proof obligation for subsumption later until it is fully applied (as this will be noted by absence of function name in the argument list and the verifier will turn to the global specification environment to look for its actual specification)

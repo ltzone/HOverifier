@@ -16,7 +16,7 @@ let div_by_one = (div 1)
 (* Not working for apply to star : arguments don't match  *)
 
 *)
-let div_by_one' x = div 1 x
+let div_by_one' = div 1
 (* Requires    { true } 
    Ensures  [m]{{ m * 1 = x } }
 *)

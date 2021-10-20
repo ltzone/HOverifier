@@ -27,10 +27,10 @@ let test () =
   let open Hiphop.Hip in
   (* let inputfile = "testcases/subsumption.ml" in
   let env = sub_env in *)
-  (* let inputfile = "testcases/div.ml" in
-  let env = div_env in *)
-  let inputfile = "testcases/double.ml" in
-  let env = double_env in
+  let inputfile = "testcases/div.ml" in
+  let env = div_env in
+  (* let inputfile = "testcases/double.ml" in
+  let env = double_env in *)
   (* let inputfile = "testcases/trivial.ml" in
   let env = trivial_env in *)
   let ic = open_in inputfile in

@@ -214,22 +214,24 @@ let rec subst_pred_normal_form a b pnf = {
  } 
 
 and subst_fun_signature a b fsig = 
-  if String.equal fsig.fname a then fsig else
+  (* if String.equal fsig.fname a then fsig else *)
+  print_endline ("wwwwwwww " ^ a ^ " " ^ b);
   { fsig with (* TODO: subst pnames? *)
               fpre= subst_pred_normal_form a b fsig.fpre;
               fpost= (* TODO: alpha renaming *)
                 (match fsig.fpost with
                 anchor, fpost -> (if String.equal a anchor then b else anchor), 
-                                  subst_pred_normal_form a b fpost );}
-              (* fname = if String.equal a fsig.fname then b else a } *)
+                                  subst_pred_normal_form a b fpost );
+              fname = if String.equal a fsig.fname then b else fsig.fname
+  }
 (* fname works as a binder and therefore needs not substitution *)
 
 
 let rec subst_fun_signature_name a b fsig = 
-    let new_pre = { fsig.fpre with spec = List.map (subst_fun_signature_name a b) fsig.fpre.spec } in
-    let new_post = (fst fsig.fpost, { (snd fsig.fpost) with 
-    spec = List.map (subst_fun_signature_name a b) ((snd fsig.fpost).spec) }) in
-    let new_name = if String.equal a fsig.fname then b else fsig.fname in
+  let new_pre = { fsig.fpre with spec = List.map (subst_fun_signature_name a b) fsig.fpre.spec } in
+  let new_post = (fst fsig.fpost, { (snd fsig.fpost) with 
+  spec = List.map (subst_fun_signature_name a b) ((snd fsig.fpost).spec) }) in
+  let new_name = if String.equal a fsig.fname then b else fsig.fname in
   { fsig with fpre = new_pre;
               fpost = new_post;
               fname = new_name }

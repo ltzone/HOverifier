@@ -80,6 +80,12 @@ let findi_opt f xs =
 
 
 let check_fun env args fvars spec_to_check pre : spec_res * env =
+  print_length (fvars);
+  print_length args;
+  print_endline (List.nth args 0);
+  print_endline (List.nth fvars 0);
+  List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
+  print_endline "www";
   let find_spec_name fname =
     (* print_endline ("11111111111");
     print_endline (String.concat "," fvars);
@@ -87,7 +93,13 @@ let check_fun env args fvars spec_to_check pre : spec_res * env =
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =
     match (find_spec_name spec.fname) with
-    | None -> failwith ("The specification declared as " ^ spec.fname ^ " is not part of the argument list")
+    | None -> 
+      (
+        match Env.find_spec (spec.fname) env with
+        | Some (spec_def::_) -> Sleek.check_spec_sub env pre spec_def spec
+        | _ -> failwith ("The specification declared as " ^ spec.fname ^ " is neither part of the argument list nor defined function \n"
+        ^ string_of_fun_spec spec )
+      )
     | Some i ->
         let fun_name_in_env = List.nth args i in
         let client_spec = Env.find_spec fun_name_in_env env in
@@ -136,9 +148,13 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
 (* if check_bool && check_env then  *)
   if List.length args = List.length spec.fvar then
     (* full application *)
+    
+    (print_endline ("aaaaaaa");print_endline (string_of_pred_normal_form spec.fpre);
     (let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
     let pure_to_check = subst_pre_to_check.pure in
     let spec_to_check = subst_pre_to_check.spec in
+
+    List.iter (fun v -> string_of_fun_spec v |> print_endline) spec_to_check;
 
 
   let check_fun_status, env = check_fun env args spec.fvar spec_to_check pure_to_check  in
@@ -151,13 +167,16 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
         print_endline (String.concat "\n" (List.map (fun (n, v) -> n ^ " : " ^ (logical_proposition_to_string v)) vs));
       | _ -> () in *)
 
+
       match check_fun_status with
       | Fail -> None 
       | check_fun_status ->
       let envs = match check_fun_status with
       | Inst vs -> 
+        if (List.length vs = 0) then assert false else ();
         List.map (Env.add_inst_group env) vs
       | _ -> [ env ] in
+
       (let new_anchor = Env.get_fresh_res_name env in
       Some (new_anchor, {
         pure= List.concat_map (fun env -> List.concat_map (fun (preds) -> (
@@ -167,20 +186,12 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
           let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
           let conj_res = preds_and_pred post_subst_env preds in
           let subst_res = subst_pure_preds_list spec.fvar args conj_res in
-          (* let subst_res = And (preds, post_subst) in *)
-          (* print_endline "----------->";
-          print_endline (pure_pred_to_string post_subst);
-          print_endline (String.concat "," spec.fvar);
-          print_endline (String.concat "," args);
-          print_endline (pure_pred_to_string preds);
-          print_endline (pure_pred_to_string subst_res);
-          print_endline "<-----------"; *)
           subst_res)
         ) pre_cond) envs;
         spec= []
         }))
         
-    else None)
+    else None))
   else 
     (* partial application *)
     let new_name = spec.fname^"'" in

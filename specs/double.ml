@@ -50,24 +50,24 @@ let incr_sig = {
 
 let incr_once_sig = {
   fname="incr_once";
-  fvar=["x"];
+  fvar=["x1"];
   pnames=[];
   fpre= {
     pure=[(True)];
     spec=[]
   };
-  fpost="res", {pure=[(Arith (Eq, Pvar "res", (Op (Plus, Pvar "x", Const (Int 1) ))))]; spec=[]};
+  fpost="res", {pure=[(Arith (Eq, Pvar "res", (Op (Plus, Pvar "x1", Const (Int 1) ))))]; spec=[]};
 }
 
 let incr_twice_sig = {
   fname="incr_twice";
-  fvar=["x"];
+  fvar=["x2"];
   pnames=[];
   fpre= {
     pure=[(True)];
     spec=[]
   };
-  fpost="res", {pure=[(Arith (Eq, Pvar "res", (Op (Plus, Pvar "x", Const (Int 2) ))))]; spec=[]};
+  fpost="res", {pure=[(Arith (Eq, Pvar "res", (Op (Plus, Pvar "x2", Const (Int 2) ))))]; spec=[]};
 }
 
 let double_sig = {

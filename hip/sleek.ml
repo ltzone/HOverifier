@@ -308,6 +308,7 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
   (* let fname_to_instantiate = VarSet.diff pre_fname post_fname in *)
   let feasible_candidates =
     List.filter (solver_check_bool ctx goal) candidates in
+  if List.length feasible_candidates = 0 then Fail else
     Inst feasible_candidates
 )
 

@@ -46,7 +46,17 @@ SMT encoding:
 
 
 ## Issues
-
+ 
 - Will we use the same abstract predicate to characterize two function parameters?
   `let foo f g x = ... { Requires f |= fpure,... g |= fpure }`
   [has implemented, to be tested]
+
+- Is it sound that we treat the multiple possible instantiations as disjunction
+
+
+- We need to remove f from below, which requires that the function specification constraints should be independent from other arguments
+```
+ _r27 :  true  with 
+        _r27(x)[fpure_twice]|= { true  with 
+        f(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}} *->:res {(fpure_twice(x,n) /\ fpure_twice(n,res))}
+```

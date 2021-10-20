@@ -47,6 +47,7 @@ let test () =
       let fname = (name_of_prog prog) in
       Format.printf "Verifying %s\n" fname;
     (* Format.printf "%a@." Printast.implementation [prog]; *)
+      try
         if infer_of_program env prog 
         then
           (output := !output ^ "\n " ^ fname ^ " verified";
@@ -55,7 +56,11 @@ let test () =
           (output := !output ^ "\n " ^ fname ^ " failed";
           Format.printf "Verify %s fail\n" fname);
           print_endline "\n------------------------\n"
-          )) progs ;
+        with
+      Failure e -> (output := !output ^ "\n " ^ fname ^ " failed because " ^ e;
+          Format.printf "Verify %s fail\n" fname);
+          print_endline "\n------------------------\n"
+        )) progs ;
 
     flush stdout;                (* 现在写入默认设备 *)
     close_in ic                  (* 关闭输入通道 *);

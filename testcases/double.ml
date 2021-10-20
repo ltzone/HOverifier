@@ -35,7 +35,7 @@ let twice f x = f (f x)
 
 
 (* fpure = \x. x+1 *)
-let incr_once x = once incr x
+let incr_once x1 = once incr x1
 (* Requires    true
    Ensures[r]  r = x + 1
 *)
@@ -67,7 +67,7 @@ REMARK: No matter how we choose to instantiate the fpure, it seems that
 
 
 
-let incr_twice x = twice incr x
+let incr_twice x2 = twice incr x2
 (* Requires    true
    Ensures[r]  r = x + 2
 *)
@@ -107,6 +107,6 @@ let incr_twice x = twice incr x
 *)
 
 
-let quad x = (twice double x)
+let quad x = (twice double) x
 (* Requires      { true }
    Ensures[res]  { res = x + x + x + x } *)

@@ -5,6 +5,8 @@ module Printast = Frontend.Printast
 module Parsetree = Frontend.Parsetree
 open Spectree
 
+let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
+
 let string_of_ident = Frontend.Longident.last
 
 let rec input_lines file =
@@ -67,6 +69,9 @@ let findi_opt f xs =
 
 let check_fun env args fvars spec_to_check pre : spec_res * env =
   let find_spec_name fname =
+    print_endline ("11111111111");
+    print_endline (String.concat "," fvars);
+    print_endline (String.concat "," args);
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =
     match (find_spec_name spec.fname) with
@@ -80,11 +85,15 @@ let check_fun env args fvars spec_to_check pre : spec_res * env =
           | _ -> failwith ("No specification found for function " ^ fun_name_in_env)
     in
     (* print_endline ("Spec to check:::::" ^ string_of_int (List.length spec_to_check)); *)
+  print_length (spec_to_check);
   let res = List.fold_right (
     fun spec (bres, (env:env)) -> match bres with Fail -> Fail, env
         | _ -> (match (check_single_fun_spec spec) with
           | Fail -> Fail, env
-          | Inst vs -> (Inst vs, List.fold_right (fun v env -> Env.add_inst env (fst v) (snd v)) vs env)
+          | Inst vs -> (Inst vs, List.fold_right (fun v env -> 
+            print_endline ("adding inst for " ^ fst v);
+            print_endline (logical_proposition_to_string (snd v));
+            Env.add_inst env (fst v) (snd v)) vs env)
           | Success -> Success, env )  (* TODO: mark the instantiated? *)) spec_to_check (Success, env) in res
 
 
@@ -205,22 +214,22 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
                 (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
                 env f_acc.spec in  
     let f_acc = {pure=pre_cond; spec=[]} in
-    (* print_endline (String.concat "," (Env.available_names env)); *)
+    print_endline (String.concat "," (Env.available_names env));
+
+    let arg_expr_list = List.map snd arg_list in
+    
+    (* Step 1: evaluate all the parameters *)
+    let eval_args (expr: expression) (last_res : env * logical_var list * pred_normal_form)
+    : env * logical_var list * pred_normal_form =
+    let old_env, arg_anchors, old_pred = last_res in
+    let new_env, new_anchor, new_cond = infer_of_expression old_env old_pred expr in
+    (new_env, new_anchor::arg_anchors, new_cond) in
+    let arg_vars = List.fold_right eval_args arg_expr_list (env, [], f_acc) in
+    let env, arg_vars, acc = arg_vars in
 
     let fname = fname in
     let fspecs = Env.find_spec fname env in
-    let arg_expr_list = List.map snd arg_list in
-
-    (* Step 1: evaluate all the parameters *)
-    let eval_args (expr: expression) (last_res : env * logical_var list * pred_normal_form)
-      : env * logical_var list * pred_normal_form =
-      let old_env, arg_anchors, old_pred = last_res in
-      let new_env, new_anchor, new_cond = infer_of_expression old_env old_pred expr in
-      (new_env, new_anchor::arg_anchors, new_cond) in
-    let arg_vars = List.fold_right eval_args arg_expr_list (env, [], f_acc) in
-
-    let env, arg_vars, acc = arg_vars in
-
+    
     (* find a function specification in the context that can be used for each disjunction branch *)
     (match fspecs with 
     | None -> failwith ("Function spec not found for [" ^ fname ^ "]")
@@ -231,9 +240,12 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
     let unified_anchor = Env.get_fresh_res_name env in
     let combine_fspecs {pure=old_pure; spec=old_spec} (anchor, {pure; spec}) = 
       { pure= (List.map (fun (pure) -> (subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
-        spec= (List.map (
-          (* print_endline anchor; print_endline unified_anchor; *)
-         subst_fun_signature anchor unified_anchor) spec)@old_spec (* TODO: subst specification *)
+        spec= (List.map ( fun v ->
+          print_endline "0000000000000";
+          print_endline (string_of_fun_spec v);
+          print_endline anchor; print_endline unified_anchor;
+          print_endline (string_of_fun_spec (subst_fun_signature_name anchor unified_anchor v));
+          subst_fun_signature_name anchor unified_anchor v) spec)@old_spec (* TODO: subst specification *)
       } in
       (env, unified_anchor, List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs))
   | _ -> assert false

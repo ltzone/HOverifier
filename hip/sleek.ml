@@ -226,8 +226,8 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
    and server signature GIVEN Z2, pre2 *-> exist y.post2
    fun1 <: fun2 should be encoded into
 
-   Forall Z1, pre /\ pre1 -> 
-    (Exists Z2, pre2 /\
+   Forall Z1, pre /\ pre2 -> 
+    (Exists Z2, pre1 /\
       (exists y. post2 -> exists x. post1))
 
    To make SMT work, Z2 needs to be instantiated in advance
@@ -260,9 +260,9 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
   let pre2_formula = (pure_preds_to_expr ctx fun2.fpre.pure) in
   let post1_formula = (pure_preds_to_expr ctx (snd fun1.fpost).pure) in
   let post2_formula = (pure_preds_to_expr ctx (snd fun2.fpost).pure) in
-  let impl_formula_lhs = Boolean.mk_and ctx [pre_formula; pre1_formula] in
+  let impl_formula_lhs = Boolean.mk_and ctx [pre_formula; pre2_formula] in
   let impl_formula_rhs = Boolean.mk_and ctx [
-      pre2_formula;
+      pre1_formula;
       forall_formula_of ctx shared_ex
         (Boolean.mk_implies ctx
           (exists_formula_of ctx spec2_ex post2_formula)

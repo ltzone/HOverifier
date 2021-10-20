@@ -224,6 +224,17 @@ and subst_fun_signature a b fsig =
               (* fname = if String.equal a fsig.fname then b else a } *)
 (* fname works as a binder and therefore needs not substitution *)
 
+
+let rec subst_fun_signature_name a b fsig = 
+    let new_pre = { fsig.fpre with spec = List.map (subst_fun_signature_name a b) fsig.fpre.spec } in
+    let new_post = (fst fsig.fpost, { (snd fsig.fpost) with 
+    spec = List.map (subst_fun_signature_name a b) ((snd fsig.fpost).spec) }) in
+    let new_name = if String.equal a fsig.fname then b else fsig.fname in
+  { fsig with fpre = new_pre;
+              fpost = new_post;
+              fname = new_name }
+
+
 (* replace ax in p by bx *)
 let rec subst_fun_signatures ax bx p =
   match ax, bx with
@@ -375,7 +386,8 @@ let lookup_ftype env fname =
 
 let add_inst env inst_name inst = 
   match SMap.find_opt inst_name env.fname_assignment with
-  | Some _ -> failwith (inst_name ^ " is already in the specification, conflict")
+  | Some _ -> 
+      failwith (inst_name ^ " is already in the specification, conflict")
   | None ->
     {
       env with

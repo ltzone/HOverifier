@@ -5,13 +5,15 @@ let div y x =
    Ensures  [r]{ r * y = x }
 *)
 
-(*
-(* Not working for apply to star : arguments don't match  *)
 let div_by_one = (div 1)
 (* Requires    { true }
    Ensures  [f]{ f(x) |= { true } *->:m { m * 1 = x } }
 *)
 (* div_one_pure(x,r): x = r  *)
+
+
+(*
+(* Not working for apply to star : arguments don't match  *)
 
 *)
 let div_by_one' x = div 1 x

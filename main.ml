@@ -15,6 +15,10 @@ let div_env =
   let open Specs.Div in
   make_sig sigs predicates pty_env
 
+let sub_env = 
+  let open Specs.Subsumption in
+  make_sig sigs predicates pty_env
+
 (* let trivial_env = 
   let open Specs.Trivial in
   make_sig sigs *)
@@ -22,8 +26,9 @@ let div_env =
 let test () = 
   let open Hiphop.Hip in
   (* let inputfile = "testcases/div.ml" in *)
-  let inputfile = "testcases/double.ml" in
+  (* let inputfile = "testcases/double.ml" in *)
   (* let inputfile = "testcases/trivial.ml" in *)
+  let inputfile = "testcases/subsumption.ml" in
   let ic = open_in inputfile in
   let output = ref "\nResult:" in
   try
@@ -33,8 +38,9 @@ let test () =
 
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
     (* let env = div_env in *)
-    let env = double_env in
+    (* let env = double_env in *)
     (* let env = trivial_env in *)
+    let env = sub_env in
     
     List.iter (fun prog -> (  
 

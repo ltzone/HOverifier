@@ -3,37 +3,37 @@ open Hiphop.Spectree
 let twice_sig = {
   fname="twice";
   fvar=["f";"x"];
-  pnames=["fpure"];
+  pnames=["fpure_twice"];
   fpre={pure=[(True)]; spec=[
     {
       fname="f";
       fvar=["a"];
       fpre={pure=[(True)]; spec=[]};
-      fpost="res0", {pure=[((Prop ("fpure", [Pvar "a"; Pvar "res0"])))]; spec=[]};
+      fpost="res0", {pure=[((Prop ("fpure_twice", [Pvar "a"; Pvar "res0"])))]; spec=[]};
       pnames=[];
     }
   ]};
   fpost="res", {pure=[
     And (
-      Prop ("fpure", [Pvar "x"; Pvar "n"]),
-      Prop ("fpure", [Pvar "n"; Pvar "res"])
+      Prop ("fpure_twice", [Pvar "x"; Pvar "n"]),
+      Prop ("fpure_twice", [Pvar "n"; Pvar "res"])
     )]; spec=[]};
 }
 
 let once_sig = {
   fname="once";
   fvar=["f"; "x"];
-  pnames=["fpure"];
+  pnames=["fpure_once"];
   fpre={pure=[(True)]; spec=[
     {
       fname="f";
       fvar=["a"];
       pnames=[];
       fpre={pure=[(True)]; spec=[]};
-      fpost="r", {pure=[((Prop ("fpure", [Pvar "a"; Pvar "r"])))]; spec=[]}  
+      fpost="r", {pure=[((Prop ("fpure_once", [Pvar "a"; Pvar "r"])))]; spec=[]}  
     }
   ]};
-  fpost="p", {pure=[(((Prop ("fpure", [Pvar "x"; Pvar "p"] ))))]; spec=[]};
+  fpost="p", {pure=[(((Prop ("fpure_once", [Pvar "x"; Pvar "p"] ))))]; spec=[]};
 }
 
 
@@ -162,8 +162,21 @@ let incr_pure = {
   ]; (* disjunctive normal form *)
 }
 
+let double_pure = {
+  pname="double_one";
+  pargs=[("q1", Int); ("q2", Int)];
+  pbody=[
+    (* Arith (Eq, Pvar "x", Pvar "r") *)
+    (* Should ensure no duplicate names *)
+    Arith (Eq, Pvar "q2", Op (Mult, Pvar "q1", Const (Int 2)))
+  ]; (* disjunctive normal form *)
+}
+
 let predicates = [
-  incr_pure;
+  (* incr_pure; *)
+  double_pure;
 ]
 
-let pty_env = SMap.empty |> SMap.add "fpure" [Int; Int]
+let pty_env = SMap.empty 
+|> SMap.add "fpure_once" [Int; Int] 
+|> SMap.add "fpure_twice" [Int; Int]

@@ -23,16 +23,23 @@ let trivial_env =
   let open Specs.Trivial in
   make_sig sigs predicates pty_env
 
+
+let fact_env = 
+  let open Specs.Fact in
+  make_sig sigs predicates pty_env
+
 let test () = 
   let open Hiphop.Hip in
-  (* let inputfile = "testcases/subsumption.ml" in
-  let env = sub_env in *)
-  let inputfile = "testcases/div.ml" in
-  let env = div_env in
+  let inputfile = "testcases/subsumption.ml" in
+  let env = sub_env in
+  (* let inputfile = "testcases/div.ml" in
+  let env = div_env in *)
   (* let inputfile = "testcases/double.ml" in
   let env = double_env in *)
   (* let inputfile = "testcases/trivial.ml" in
   let env = trivial_env in *)
+  (* let inputfile = "testcases/fact.ml" in
+  let env = fact_env in *)
   let ic = open_in inputfile in
   let output = ref "\nResult:" in
   try
@@ -46,7 +53,7 @@ let test () =
 
       let fname = (name_of_prog prog) in
       Format.printf "Verifying %s\n" fname;
-    (* Format.printf "%a@." Printast.implementation [prog]; *)
+    Format.printf "%a@." Printast.implementation [prog];
       try
         if infer_of_program env prog 
         then

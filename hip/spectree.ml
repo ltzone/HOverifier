@@ -5,7 +5,8 @@ type logical_var = string
 type program_var = string
 
 
-type constant = Int of int
+type constant = Int of int 
+(* | Bool of bool *)
 
 type bin_operator = Plus | Minus | Mult
 
@@ -16,7 +17,8 @@ type logical_exp = Pvar of program_var
 | Op of bin_operator * logical_exp * logical_exp
 
 
-type exp_type = Int
+type exp_type = Int 
+(* | Bool *)
 
 type fun_id = string
 
@@ -87,6 +89,7 @@ let rec logical_exp_to_string = function
 | Lvar v -> v
 (* | Fun (v, vs) -> String.concat "" ([v;"("] @ [(String.concat "," (List.map logical_exp_to_string vs))] @ [")"] ) *)
 | Const (Int i) -> string_of_int i
+(* | Const (Bool i) -> string_of_bool i *)
 | Op (oper, t1, t2) ->
     let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" in
     String.concat "" ["("; logical_exp_to_string t1; op_str; logical_exp_to_string t2; ")"]
@@ -127,6 +130,7 @@ and string_of_fun_spec {fname; fvar; pnames; fpre; fpost} =
 
 let string_of_ty = function
 | Int -> "int"
+(* | Bool -> "bool" *)
 
 let logical_proposition_to_string  {pname;  pargs;  pbody;} = 
   String.concat ""
@@ -146,7 +150,7 @@ let rec subst_logical_exp a b =
 | Pvar v -> Pvar (subst_str v)
 | Lvar v -> Lvar v
 (* | Fun (v, vs) -> Fun (subst_str v, List.map (subst_logical_exp a b) vs) *)
-| Const (Int i) -> Const (Int i)
+| Const x -> Const x
 | Op (oper, t1, t2) -> Op (oper, subst_logical_exp a b t1, subst_logical_exp a b t2)
 
 

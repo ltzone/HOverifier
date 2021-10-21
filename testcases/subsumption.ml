@@ -13,7 +13,7 @@ let bar f a b = f (f a b) b
 
 *)
 
-let baz c d = bar foo c d
+let baz c d = (bar foo c d)
 (* Requires 
       d >= 0
       

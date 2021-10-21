@@ -193,11 +193,12 @@ let solver_check_bool ctx goal (cand: prop_candidates) =
 let var_quantifier_of_spec (spec: fun_signature) : logical_var list * logical_var list =
   let pre = spec.fpre.pure in
   let post = (snd spec.fpost).pure in
+  let fvars = VarSet.of_list spec.fvar in
   let pre_fvs = fvars_of_pures pre in
   let post_fvs = fvars_of_pures post in
   let post_exs = VarSet.diff post_fvs pre_fvs in 
-  let forall_vars = VarSet.elements pre_fvs in
-  let exists_vars = VarSet.elements post_exs in 
+  let forall_vars = VarSet.elements (VarSet.union pre_fvs fvars) in
+  let exists_vars = VarSet.elements (VarSet.diff post_exs fvars) in 
   (forall_vars, exists_vars)
 
 
@@ -238,7 +239,7 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
 
    Forall Z1, pre /\ pre2 -> 
     (Exists Z2, pre1 /\
-      (exists y. post2 -> exists x. post1))
+      (exists y. post1 -> exists x. post2))
 
    To make SMT work, Z2 needs to be instantiated in advance
    so that we can use negation technique to check the globally
@@ -275,8 +276,9 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
       pre1_formula;
       forall_formula_of ctx shared_ex
         (Boolean.mk_implies ctx
-          (exists_formula_of ctx spec2_ex post2_formula)
-          (exists_formula_of ctx spec1_ex post1_formula))
+        (exists_formula_of ctx spec1_ex post1_formula)
+        (exists_formula_of ctx spec2_ex post2_formula)
+      )
   ] in
   let quanti_rhs = exists_formula_of ctx spec2_all impl_formula_rhs in
   let impl_formula = Boolean.mk_implies ctx impl_formula_lhs quanti_rhs in

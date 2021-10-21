@@ -37,29 +37,10 @@ Need to prove `foo <: f`
 SMT encoding:
 0<=d /\ 0 <=y  ===>
   true /\
-  (forall x, res,  res <= x ==> res = x - y )
+  (forall x, res,  res = x - y ==> res <= x  )
 ```
 
 
-## If branching
-
-
-
-## Issues
- 
-- Will we use the same abstract predicate to characterize two function parameters?
-  `let foo f g x = ... { Requires f |= fpure,... g |= fpure }`
-  [has implemented, to be tested]
-
-- Is it sound that we treat the multiple possible instantiations as disjunction
-
-
-- We need to remove f from below, which requires that the function specification constraints should be independent from other arguments
-```
- _r27 :  true  with 
-        _r27(x)[fpure_twice]|= { true  with 
-        f(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}} *->:res {(fpure_twice(x,n) /\ fpure_twice(n,res))}
-```
 
 
 ## Resolve partial application
@@ -105,3 +86,64 @@ let quad x = (twice double) x
 - The two styles are essentially generating the same VC, the only difference is that
   - for full application, we check the subsumption when do the application
   - for partial application, we first do the substitution and postpone the proof obligation for subsumption later until it is fully applied (as this will be noted by absence of function name in the argument list and the verifier will turn to the global specification environment to look for its actual specification)
+
+
+
+
+## If branching
+
+implemented
+
+
+
+## Recursive predicates
+
+
+```OCaml
+let rec fact n =
+  if n = 0 then 1 else (n * (fact (n - 1)))
+
+(* FactP(n,res) == n = 0 /\ res = 1
+                or FactP(n-1, r) /\ res=r*n *)
+
+(* 
+   Requires     { n >= 0 }
+   Ensures:res  { FactP(n,res) }
+*)
+```
+
+The verification of the else branch:
+```
+n >= 0 /\ n != 0 /\ true /\ FactP(n-1, w) /\ res = n * w
+|-- FactP(n, res)
+```
+
+
+Use sleek to verify the entailment of **inductively defined predicates**?
+
+```
+pred fact<n,r> == n = 0 & r = 1
+    or self::fact<n-1,r2>  & r = r2 * n
+    inv n >= 0.
+
+checkentail x::fact<n-1, w> & r = w * n & n > 0 |- x::fact<n,r>.
+```
+
+
+
+
+## Notes
+ 
+- Will we use the same abstract predicate to characterize two function parameters?
+  `let foo f g x = ... { Requires f |= fpure,... g |= fpure }`
+  [has implemented, to be tested]
+
+- Is it sound that we treat the multiple possible instantiations as disjunction
+
+
+- We need to remove f from below, which requires that the function specification constraints should be independent from other arguments
+```
+ _r27 :  true  with 
+        _r27(x)[fpure_twice]|= { true  with 
+        f(a)[]|= { true } *->:res0 {fpure_twice(a,res0)}} *->:res {(fpure_twice(x,n) /\ fpure_twice(n,res))}
+```

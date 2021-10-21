@@ -233,6 +233,16 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
          therefore we can safely ignore and proceed the forward verification.
       *)
 
+  | Pexp_construct ({txt=Lident "true";_} , None) ->
+      let fresh_anchor = Env.get_fresh_res_name env in
+      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Int 1)) in 
+      env, fresh_anchor, add_constraint acc new_constraint
+
+  | Pexp_construct ({txt=Lident "false";_} , None) ->
+      let fresh_anchor = Env.get_fresh_res_name env in
+      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Int 0)) in 
+      env, fresh_anchor, add_constraint acc new_constraint
+
   | Pexp_constant (Pconst_integer (num, sufix)) ->
       (* for constant x, 
            add constraint _r = x /\ ... *)
@@ -299,6 +309,37 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
           subst_fun_signature_name anchor unified_anchor v) spec)@old_spec (* TODO: subst specification *)
       } in
       (env, unified_anchor, List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs))
+  
+  | Pexp_ifthenelse (b_exp, e1, Some e2) ->
+      (* Step 0: evaluate the boolean *)
+      let env, bname, f_acc = 
+        infer_of_expression env acc b_exp in
+
+      (* Step 0: normalize the condition again *)
+      let pre_cond = f_acc.pure in
+      let env = List.fold_left 
+                  (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
+                  env f_acc.spec in 
+      let f_acc = {pure=pre_cond; spec=[]} in
+
+      (* Step 1: eval two branches *)
+      let true_cond = add_constraint f_acc (Arith (Eq, Pvar bname, Const (Int 1))) in
+      let env, bname_t, f_acc_t = infer_of_expression env true_cond e1 in 
+      let false_cond = add_constraint f_acc (Arith (Eq, Pvar bname, Const (Int 0))) in
+      let env, bname_f, f_acc_f = infer_of_expression env false_cond e2 in
+      (* TODO: can env be passed consecutively this way? *)
+
+      (* Step 2: unify post_conditions *)
+      let unified_anchor = Env.get_fresh_res_name env in
+      let f_acc_t = subst_pred_normal_form bname_t unified_anchor f_acc_t in
+      let f_acc_f = subst_pred_normal_form bname_f unified_anchor f_acc_f in
+      env, unified_anchor, {pure= f_acc_t.pure @ f_acc_f.pure; spec=f_acc_t.spec @ f_acc_f.spec }
+
+
+
+
+  
+  
   | _ -> assert false
 
     in print_endline ("hip: " ^match res with _, anchor, res ->  anchor ^ " : " ^  string_of_pred_normal_form (res)); res

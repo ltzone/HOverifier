@@ -219,7 +219,6 @@ let rec subst_pred_normal_form a b pnf = {
 
 and subst_fun_signature a b fsig = 
   (* if String.equal fsig.fname a then fsig else *)
-  print_endline ("wwwwwwww " ^ a ^ " " ^ b);
   { fsig with (* TODO: subst pnames? *)
               fpre= subst_pred_normal_form a b fsig.fpre;
               fpost= (* TODO: alpha renaming *)

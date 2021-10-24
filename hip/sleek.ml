@@ -288,8 +288,6 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
     quanti_formula] in *)
   Goal.add goal [quanti_formula];
   print_endline (Expr.to_string (quanti_formula));
-  (* let quantified_formula = Quantifier.mk_forall_const ctx  in *)
-  (* print_endline "finished checking";  *)
   
 (* Step 2: try high level verification *)
   let ho_verif = solver_check_bool ctx goal [] in
@@ -301,13 +299,8 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
       (VarSet.union (fname_of_pures fun2.fpre.pure)
       (fname_of_pures (snd fun2.fpost).pure)) in
   let fname_sig_to_inst = List.map (Env.lookup_ftype env) fname_to_instantiate in
-  (* print_endline (pure_preds_to_string (snd fun2.fpost).pure);
-  print_endline (string_of_int (List.length fname_sig_to_inst)); *)
   let candidates = make_prop_candidates env fname_sig_to_inst in
   print_assignment_groups candidates;
-  (* print_endline (string_of_int (List.length candidates)); *)
-  (* let post_fname = fname_of_pure post VarSet.empty in *)
-  (* let fname_to_instantiate = VarSet.diff pre_fname post_fname in *)
   let feasible_candidates =
     List.filter (solver_check_bool ctx goal) candidates in
   if List.length feasible_candidates = 0 then Fail else
@@ -332,10 +325,6 @@ let check_pure (pre: pure_pred list) (post:pure_pred list) : bool =
   let post_formula = (pure_preds_to_expr ctx post) in
 
 
-
-  (* print_endline ("sleek: need to instantiate: " ^ String.concat "," (VarSet.elements fname_to_instantiate) ); *)
-
-
   (* let is = (Arithmetic.Integer.mk_sort ctx) in *)
   (* let forall_types = List.map (fun _ -> is) forall_vars in *)
   let forall_xs = List.map (fun v -> Expr.mk_const_s ctx v (Arithmetic.Integer.mk_sort ctx)) forall_vars in
@@ -357,10 +346,7 @@ let check_pure (pre: pure_pred list) (post:pure_pred list) : bool =
   (* let impl_formula = Boolean.mk_or ctx [Boolean.mk_not ctx pre_formula; post_formula] in *)
   (* Goal.add goal [ impl_formula ]; *)
   Goal.add goal [impl_formula];
-  (* print_endline (Expr.to_string (impl_formula)); *)
-  (* let quantified_formula = Quantifier.mk_forall_const ctx  in *)
   let res = solver_check_bool ctx goal [] in
-  (* print_endline "finished checking";  *)
   res
 
 

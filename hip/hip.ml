@@ -80,16 +80,8 @@ let findi_opt f xs =
 
 
 let check_fun env args fvars spec_to_check pre : spec_res * env =
-  print_length (fvars);
-  print_length args;
-  print_endline (List.nth args 0);
-  print_endline (List.nth fvars 0);
   List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
-  print_endline "www";
   let find_spec_name fname =
-    (* print_endline ("11111111111");
-    print_endline (String.concat "," fvars);
-    print_endline (String.concat "," args); *)
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =
     match (find_spec_name spec.fname) with
@@ -149,8 +141,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (logical_var * p
   if List.length args = List.length spec.fvar then
     (* full application *)
     
-    (print_endline ("aaaaaaa");print_endline (string_of_pred_normal_form spec.fpre);
-    (let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
+    ((let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
     let pure_to_check = subst_pre_to_check.pure in
     let spec_to_check = subst_pre_to_check.spec in
 
@@ -302,10 +293,9 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
     let combine_fspecs {pure=old_pure; spec=old_spec} (anchor, {pure; spec}) = 
       { pure= (List.map (fun (pure) -> (subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
         spec= (List.map ( fun v ->
-          print_endline "0000000000000";
-          print_endline (string_of_fun_spec v);
+          (*  print_endline (string_of_fun_spec v);
           print_endline anchor; print_endline unified_anchor;
-          print_endline (string_of_fun_spec (subst_fun_signature_name anchor unified_anchor v));
+          print_endline (string_of_fun_spec (subst_fun_signature_name anchor unified_anchor v)); *)
           subst_fun_signature_name anchor unified_anchor v) spec)@old_spec (* TODO: subst specification *)
       } in
       (env, unified_anchor, List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs))

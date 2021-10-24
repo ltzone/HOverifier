@@ -2,16 +2,17 @@
 
 ## TODO list
 
-> issue, function as return value, how should the specification be layed out? { true } *-> {true with f(x)=... } ? or just f(x) = ...
 
-- subsumption check
-  - what about a nested function specification?
-    - example of div_by_one
-- general specification
+- what about a nested function specification?
+> issue, function as return value, how should the specification be layed out? { true } *-> {true with f(x)=... } ? or just f(x) = ...
+  - example of div_by_one
+- [x] subsumption check
+- [x] general specification
   - first implemented as user declared, then find ways to automate it
   > prefer with explicit instantiation, because it fits the design of user-defined predicate
   - implemented by adding an extra constraint to the solver
 - if structure
+  - add bool type to the assertion language
 - ADT, match structure
 - refine the disjunctive normal form reasoning
 - predicate system to support recursive reasoning
@@ -47,6 +48,26 @@ To use z3 on MacOS, copy the dynamic library to the build directory
 cp `opam config var z3:lib`/libz3.dylib .
 cp libz3.dylib _build/default
 ```
+
+
+### Install HIP/SLEEK
+
+- advanced use cases in this project requires the SLEEK solver
+- you can build sleek as follows:
+  ```
+  opam install cppo Num OCamlgraph FileUtils Batteries Camlp4 extlib
+  ```
+- for mac user
+  ```
+  cd omega_modified
+  make depend
+  cd omega_calc/obj
+  make
+  sudo cp oc /usr/local/bin
+  ```
+- `cd xml; make clean; make`
+- `make`
+  
 
 ## Acknowledgements
 

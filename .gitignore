@@ -1,6 +1,8 @@
 utils/config.ml
 libz3.dylib
 z3.log
+sleek_test/logs/*
+sleek_test/*.out
 
 .vscode
 .DS_store

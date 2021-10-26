@@ -1,0 +1,3 @@
+declare div(y, x)
+requires    { true }
+ensures  [r]{ true }

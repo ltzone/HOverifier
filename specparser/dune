@@ -1,0 +1,13 @@
+(menhir 
+  (modules parser))
+
+(ocamllex
+ (modules lexer) )
+
+ (executable
+  (name driver)
+  (libraries hiphop ))
+
+  (env
+  (dev
+    (flags (:standard -w -39))))

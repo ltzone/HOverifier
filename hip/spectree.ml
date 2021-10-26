@@ -1,5 +1,8 @@
 (* logical expressions *)
 
+
+
+
 type logical_var = string
 
 type program_var = string
@@ -34,6 +37,7 @@ type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
 
 type pred = pure_pred
 
+
 type pred_normal_form = {
   pure: pred list; 
   (* disjunctive normal form of pure formulas *)
@@ -54,7 +58,6 @@ type logical_proposition = {
   pargs: (logical_var * exp_type) list;
   pbody: pred list; (* disjunctive normal form *)
 }
-
 
 type spec_res = 
 | Fail

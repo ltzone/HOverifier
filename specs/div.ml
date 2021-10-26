@@ -60,7 +60,7 @@ let div_by_one'_sig = {
 let twice_sig = {
   fname="twice";
   fvar=["f";"x"];
-  pnames=["fpure"];
+  pnames=[];
   fpre={pure=[(True)]; spec=[
     {
       fname="f";

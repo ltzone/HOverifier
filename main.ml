@@ -7,40 +7,30 @@ let make_sig sigs predicates pty_env =
       ftype_context = pty_env;
   }
 
-let double_env = 
-  let open Specs.Double in
-  make_sig sigs predicates pty_env
+let make_sig_from_file filename = 
+  let open Specparser.Driver in
+  (* let open Hiphop.Spectree in *)
+  let sigs, predicates, pty_env = parse_from_file filename in
+  print_endline (string_of_parse (parse_from_file filename));
+  let sigs = Specparser.Prelude.sigs @ sigs in
+  let predicates = Specparser.Prelude.predicates @ predicates in
 
-let div_env = 
-  let open Specs.Div in
-  make_sig sigs predicates pty_env
-
-let sub_env = 
-  let open Specs.Subsumption in
-  make_sig sigs predicates pty_env
-
-let trivial_env = 
-  let open Specs.Trivial in
-  make_sig sigs predicates pty_env
-
-
-let fact_env = 
-  let open Specs.Fact in
+  (* let make_pty_env_sigle ({ pname; pargs; _}: logical_proposition) pty_map =
+    SMap.add pname  (List.map snd pargs) pty_map in
+  let pty_env = List.fold_right make_pty_env_sigle predicates SMap.empty in *)
   make_sig sigs predicates pty_env
 
 let test () = 
   let open Hiphop.Hip in
-  (* let inputfile = "testcases/subsumption.ml" in
-  let env = sub_env in *)
-  let inputfile = "testcases/div.ml" in
-  let env = div_env in
-  (* let inputfile = "testcases/double.ml" in
-  let env = double_env in *)
-  (* let inputfile = "testcases/trivial.ml" in
-  let env = trivial_env in *)
-  (* let inputfile = "testcases/fact.ml" in
-  let env = fact_env in *)
-  let ic = open_in inputfile in
+  let module_name = 
+    if Array.length (Sys.argv) < 1 then
+      "double"
+    else Array.get Sys.argv 1 in
+  let input_module = "testcases/" ^ module_name in
+  let input_program = input_module ^ ".ml" in
+  let input_spec = input_module ^ ".ss" in
+  let env = make_sig_from_file input_spec in
+  let ic = open_in input_program in
   let output = ref "\nResult:" in
   try
     let lines =  (input_lines ic ) in
@@ -53,7 +43,7 @@ let test () =
 
       let fname = (name_of_prog prog) in
       Format.printf "Verifying %s\n" fname;
-    Format.printf "%a@." Printast.implementation [prog];
+    (* Format.printf "%a@." Printast.implementation [prog]; *)
       try
         if infer_of_program env prog 
         then

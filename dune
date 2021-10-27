@@ -1,6 +1,6 @@
 (executable
  (name main)
- (libraries hiphop frontend utils z3 specs)
+ (libraries hiphop frontend utils z3 specparser)
  (link_flags -cc g++))
 
 

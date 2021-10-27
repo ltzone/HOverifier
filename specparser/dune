@@ -4,9 +4,9 @@
 (ocamllex
  (modules lexer) )
 
- (executable
-  (name driver)
-  (libraries hiphop ))
+ (library
+  (name specparser)
+  (libraries hiphop core))
 
   (env
   (dev

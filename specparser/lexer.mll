@@ -16,13 +16,20 @@ let digit = ['0'-'9']
 let int = '-'? digit digit*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
-let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
+let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_' ''']*
 
+
+(* rule read_code = 
+  parse
+  | "(*@"   { read lexbuf }
+  | eof     { EOF }
+  | _       { read_code lexbuf } *)
 rule read =
   parse
   | white  { read lexbuf }  (* skip blanks *)
-  | newline { read lexbuf }
-  | "//" { comment lexbuf }
+  | newline {  next_line lexbuf; read lexbuf }
+  | "//"   { comment lexbuf }
+  (* | "*)"   { read_code lexbuf } *)
   | '{'    { LEFT_BRACKET }
   | '}'    { RIGHT_BRACKET }
   | '['    { LEFT_SQUARE }
@@ -32,7 +39,9 @@ rule read =
   | "true" { TRUE }
   | ')'    { RIGHT_BRACE }
   | "+"    { PLUS }
+  | "&"    { AND }
   | "||"   { OR }
+  | "or"   { OR }
   | "*"    { MULT }
   | "-"    { MINUS }
   | "("    { LEFT_BRACE }
@@ -43,11 +52,20 @@ rule read =
   | "declare" { DECLARE }
   | "pred" { PRED }
   | "="   { EQ }
+  | ","     { COLON }
+  | "int"     { TINT }
+  | "bool"     { TBOOL }
+  | "|="        { HASSPEC }
+  | "*->:"      { PREPOST }
+  | "with"      { WITH }
+  | "~"         { NEG }
+  | ":"         { COLON }
+  | "given"     { GIVEN }
   | id     { ID (Lexing.lexeme lexbuf) }
   | _      { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof    { EOF }
 and comment =
   parse
-  | newline { read lexbuf }
+  | newline {  next_line lexbuf; read lexbuf }
   | eof     { EOF }
   | _       { comment lexbuf }

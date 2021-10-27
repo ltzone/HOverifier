@@ -81,6 +81,7 @@ let findi_opt f xs =
 
 let check_fun env args fvars spec_to_check pre : spec_res * env =
   List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
+  print_endline ("www" ^ String.concat "," fvars);
   let find_spec_name fname =
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =

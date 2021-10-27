@@ -393,6 +393,8 @@ let empty = {
   ftype_context = SMap.empty;
 }
 
+let insted_preds env = List.map fst (SMap.bindings env.fname_assignment)
+
 let lookup_ftype env fname =
   match SMap.find_opt fname env.ftype_context with
   | Some v -> fname, v
@@ -435,30 +437,28 @@ let available_names env = List.map fst (SMap.bindings (env.specs))
 
 end
 
+let rec instantiate_pred fname assign pure_pred : pure_pred list =
+  match pure_pred with
+  | Arith (op, x1, x2) -> [ Arith (op, x1, x2) ]
+  | And (p1, p2) -> 
+      let p1_inst = instantiate_pred fname assign p1 in
+      let p2_inst = instantiate_pred fname assign p2 in
+      List.concat_map (fun v -> List.map (fun x -> And (v, x)) p1_inst) p2_inst 
+  | Prop (fn, es) ->
+      if String.equal fname fn
+        then fill_pure_preds_list (List.map fst (assign.pargs)) es (assign.pbody)
+      else  [ Prop (fn, es) ]
+  | Neg p -> instantiate_pred fname assign p
+  | True  -> [ True ]
+  | False -> [ False ]
 
 
+let instantiate_preds fname assign pure_preds : pure_pred list =
+  List.concat_map (instantiate_pred fname assign) pure_preds
 
 let instantiate_pure_preds fname_assignment pure_preds =
   if List.length (fname_assignment) > 0 then
     print_endline (logical_proposition_to_string (snd (List.nth ( fname_assignment) 0)))
   else ();
-
-  let rec instantiate_pred fname assign pure_pred : pure_pred list =
-    match pure_pred with
-    | Arith (op, x1, x2) -> [ Arith (op, x1, x2) ]
-    | And (p1, p2) -> 
-        let p1_inst = instantiate_pred fname assign p1 in
-        let p2_inst = instantiate_pred fname assign p2 in
-        List.concat_map (fun v -> List.map (fun x -> And (v, x)) p1_inst) p2_inst 
-    | Prop (fn, es) ->
-        if String.equal fname fn
-          then fill_pure_preds_list (List.map fst (assign.pargs)) es (assign.pbody)
-        else  [ Prop (fn, es) ]
-    | Neg p -> instantiate_pred fname assign p
-    | True  -> [ True ]
-    | False -> [ False ] in
-
-  let instantiate_preds fname assign pure_preds : pure_pred list =
-    List.concat_map (instantiate_pred fname assign) pure_preds in
   
   List.fold_right (fun (fname, (ass:logical_proposition)) pred -> instantiate_preds fname ass pred) fname_assignment pure_preds

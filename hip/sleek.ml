@@ -7,10 +7,10 @@ exception TestFailedException of string
 let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
 
 let print_assignment_groups vs =
-  print_endline "[[[[[]]]]]";
+  print_endline "[[[[[candidate assignments ]]]]]";
   List.iter (fun vs' ->
     List.iter (fun (n, v) -> print_endline (n ^" : " ^ logical_proposition_to_string v)) vs';
-    print_endline "-----") vs;
+    print_endline "----------------------------") vs;
 
 type prop_candidates = (fun_id * logical_proposition) list
 
@@ -307,10 +307,7 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
     Inst feasible_candidates
 )
 
-let check_pure (pre: pure_pred list) (post:pure_pred list) : bool = 
-  print_endline "sleek: checking for pre and post";
-  print_endline ("[pre] " ^ pure_preds_to_string pre);
-  print_endline ("[post] " ^ pure_preds_to_string post);
+let make_goal ctx pre post =
 
   let pre_fvs = fvars_of_pures pre in
   let post_fvs = fvars_of_pures post in
@@ -318,9 +315,6 @@ let check_pure (pre: pure_pred list) (post:pure_pred list) : bool =
   let forall_vars = VarSet.elements pre_fvs in
   let exists_vars = VarSet.elements post_exs in 
 
-  let cfg = [("model", "true"); ("proof", "true")] in
-  let ctx = (mk_context cfg) in
-  let goal = Goal.mk_goal ctx true true true in 
   let pre_formula = (pure_preds_to_expr ctx pre) in
   let post_formula = (pure_preds_to_expr ctx post) in
 
@@ -345,17 +339,59 @@ let check_pure (pre: pure_pred list) (post:pure_pred list) : bool =
   (* let impl_formula = (Boolean.mk_and ctx [Quantifier.expr_of_quantifier pre_formula; Boolean.mk_not ctx post_formula]) in *)
   (* let impl_formula = Boolean.mk_or ctx [Boolean.mk_not ctx pre_formula; post_formula] in *)
   (* Goal.add goal [ impl_formula ]; *)
+  impl_formula
+
+let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool = 
+  print_endline "sleek: checking for pre and post";
+  print_endline ("[pre] " ^ pure_preds_to_string pre);
+  print_endline ("[post] " ^ pure_preds_to_string post);
+
+  let cfg = [("model", "true"); ("proof", "true")] in
+  let ctx = (mk_context cfg) in
+  let goal = Goal.mk_goal ctx true true true in 
+
+  let impl_formula = make_goal ctx pre post in
+
   Goal.add goal [impl_formula];
   let res = solver_check_bool ctx goal [] in
-  res
+  if res then true else 
+
+  ((* Step 3: try instantiate from user-defined predicates *)
+  let fname_to_instantiate = 
+    list_diff
+      (VarSet.elements
+        (VarSet.union (fname_of_pures pre)
+        (fname_of_pures post)))
+      (Env.insted_preds env) in
+  let fname_sig_to_inst = List.map (Env.lookup_ftype env) fname_to_instantiate in
+  let candidates = make_prop_candidates env fname_sig_to_inst in
+  print_assignment_groups candidates;
+  let check_candidate candidate =
+    let inst_post = instantiate_pure_preds candidate post in
+    let cfg = [("model", "true"); ("proof", "true")] in
+    let ctx = (mk_context cfg) in
+    let goal = Goal.mk_goal ctx true true true in 
+
+    let impl_formula = make_goal ctx pre inst_post in
+
+    Goal.add goal [impl_formula];
+    solver_check_bool ctx goal []
+  in
+
+  let feasible_candidates =
+    List.filter check_candidate candidates in
+  if List.length feasible_candidates = 0 then false else
+    true
+)
 
 
 
-let main () = 
+
+(* let main () = 
   (* let pre = False in *)
   let pre = And ((And (Arith (Eq, (Pvar "x"), Const (Int 2)), Arith (Le, (Pvar "y"), Const (Int 6)))),
                   (Prop ("f", [Pvar "x"; Pvar "y"; Pvar "z"]))) in
   (* let post = True in *)
   let post = And (And ((Arith (Eq, (Pvar "x"), Const (Int 2))), Arith (Le, (Pvar "res"), Const (Int 6))), 
                 (Prop ("f", [Const (Int 2); Pvar "y"; Pvar "z"]))) in
-  print_endline (string_of_bool (check_pure [pre] [post]))
+  print_endline (string_of_bool (check_pure [pre] [post])) *)

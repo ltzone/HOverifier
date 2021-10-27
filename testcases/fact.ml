@@ -5,7 +5,7 @@ let rec fact n =
 declare fact(n)
 given factP(int,int)
 requires { true }
-ensures[res] { factP(x,res) }
+ensures[res] { factP(n,res) }
 
 
 pred factP(q1:int,q2:int) |=

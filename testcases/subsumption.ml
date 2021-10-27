@@ -1,22 +1,31 @@
 
 let foo x y = x - y
-(* true *-> res = x - y *)
+(*@
+declare foo(x,y)
+requires { true }
+ensures[res] { res = x - y }
+@*)
 
 
 let bar f a b = f (f a b) b
-(* Requires 
-      f(m,n) |= { n >= 0 } *->:res { res <= m}
-      b >= 0
-      
-   Ensures[r]
-      r <= a
 
-*)
+
+(*@
+declare bar(f,a,b)
+given 
+requires { 0 <= b with
+    f(m,n) |= { 0 <= n } *->:res0 { res0 <= m }
+ }
+ensures[p] { p <= a }
+@*)
+
 
 let baz c d = (bar foo c d)
-(* Requires 
-      d >= 0
-      
-   Ensures[r]
-      r <= c
-*)
+
+
+(*@
+declare baz(c,d)
+given 
+requires { 0 <= d }
+ensures[r] { r <= c }
+@*)

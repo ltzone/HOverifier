@@ -12,14 +12,15 @@ let print_position outx lexbuf =
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
 let parse_with_error lexbuf =
-  try Parser.parse Lexer.read lexbuf with
+  try Parser.parse Lexer.lexer lexbuf with
   | Lexer.SyntaxError msg ->
     Core.fprintf stderr "%a: %s\n" print_position lexbuf msg;
     [],[], Hiphop.Spectree.SMap.empty
   | Parser.Error ->
-
+    print_endline (Lexing.lexeme lexbuf);
     Core.fprintf stderr "%a: syntax error\n" print_position lexbuf;
-    exit (-1)
+    [],[], Hiphop.Spectree.SMap.empty
+    (* exit (-1) *)
 
 
 let parse_from_file filename =
@@ -30,4 +31,4 @@ let parse_from_file filename =
   Core.In_channel.close inx; res
     
 
-(* let _ = print_endline (string_of_parse (parse_from_file file));; *)
+(* let _ = print_endline (string_of_parse (parse_from_file "./testcases/div.ml"));; *)

@@ -1,34 +1,46 @@
 let div y x = 
-   (* if y = 0 then assert false else  *)
       (x / y)
-(* Requires    { y != 0 }
-   Ensures  [r]{ r * y = x }
-*)
+
+(*@
+declare div(y, x)
+requires    { ~ y = 0 }
+ensures  [r]{ r * y = x }
+@*)
 
 let div_by_one = (div 1)
-(* Requires    { true }
-   Ensures  [f]{ f(x) |= { true } *->:m { m * 1 = x } }
-*)
-(* div_one_pure(x,r): x = r  *)
+(*@
+declare div_by_one()
+requires    { true }
+ensures  [f]{ true with 
+                f(x) |= { true } *->:m { m * 1 = x } }
+@*)
 
 
-(*
-(* Not working for apply to star : arguments don't match  *)
-
-*)
 let div_by_one' = div 1
-(* Requires    { true } 
-   Ensures  [m]{{ m * 1 = x } }
-*)
+(*@
+declare div_by_one'(x)
+requires    { true } 
+ensures  [m]{ m * 1 = x }
+@*)
 
 let twice f x = f (f x)
-(* Given Q
-   Requires    { f(x) |= {true} *->r:{Q(x,r)} }
-   Ensures  [r]{ Q(x,m) & Q(m,r) }
-*)
+(*@
+declare twice(f,x)
+given Q(int, int)
+requires    { true with
+                f(x) |= {true} *->:r {Q(x,r)} }
+ensures  [r]{ Q(x,m) & Q(m,r) }
+@*)
+
 
 
 let div_by_one_star x = twice div_by_one' x
-(* Requires    { true /\ twice[Q=div_one_pure] }
-   Ensures  [r]{ r=x }
-*)
+(*@
+declare div_by_one_star(x)
+requires    { true }
+ensures  [r]{ r=x }
+
+// a candidate predicate for twice to i
+pred div_one(q1:int,q2:int) |= 
+ q1 = q2
+@*)

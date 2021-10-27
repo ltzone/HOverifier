@@ -8,6 +8,10 @@
   (name specparser)
   (libraries hiphop core))
 
+;  (executable
+;   (name driver)
+;   (libraries hiphop core))
+
   (env
   (dev
     (flags (:standard -w -39))))

@@ -1,16 +1,32 @@
 let once f x = f x
-(* Requires { f(a) |= { true } *->:r { r=fpure(a) } }
-   Ensures[p] { p = fpure(x) }
-*)
 
+(*@
+declare once(f,x)
+given fpure2(int,int)
+requires { true with
+   f(a) |= { true } *->:r { fpure2(a,r)}  }
+ensures[p] { fpure2(x,p) }
+@*)
 
 let two_arg f x y = f x y
-(* Requires { f(a,b) |= { true } *->:r { r=fpure(a,b) } }
-   Ensures[p] { p = fpure(x) }
-*)
+
+(*@
+declare two_arg(x,y)
+given fpure3(int,int,int)
+requires { true with
+  f(a,b) |= {true} *->:r {fpure3(a,b,r)} }
+ensures[res] { fpure3(x,y,res) }
+@*)
+
 
 
 let twice f x = f (f x)
-(* Requires { f(a) |= { true } *->:res0 { res0=fpure(a) } }
-   Ensures[res] { res = fpure(fpure(x)) }
-*)
+(*@
+declare twice(f,x)
+given fpure(int,int)
+requires { true with
+    f(a) |= { true } *->:res0 {fpure(a,res0)} }
+ensures[res] { fpure(x,n) & fpure(n,res) }
+@*)
+
+

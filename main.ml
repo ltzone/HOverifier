@@ -23,12 +23,12 @@ let make_sig_from_file filename =
 let test () = 
   let open Hiphop.Hip in
   let module_name = 
-    if Array.length (Sys.argv) < 1 then
+    if Array.length (Sys.argv) <= 1 then
       "double"
     else Array.get Sys.argv 1 in
   let input_module = "testcases/" ^ module_name in
   let input_program = input_module ^ ".ml" in
-  let input_spec = input_module ^ ".ss" in
+  let input_spec = input_module ^ ".ml" in
   let env = make_sig_from_file input_spec in
   let ic = open_in input_program in
   let output = ref "\nResult:" in

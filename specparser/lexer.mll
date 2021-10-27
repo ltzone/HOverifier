@@ -10,6 +10,11 @@ let next_line lexbuf =
     { pos with pos_bol = lexbuf.lex_curr_pos;
                pos_lnum = pos.pos_lnum + 1
     }
+
+
+
+type state = CODE | SPEC
+let state = ref CODE
 }
 
 let digit = ['0'-'9']
@@ -19,17 +24,20 @@ let newline = '\r' | '\n' | "\r\n"
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_' ''']*
 
 
-(* rule read_code = 
+rule read_code = 
   parse
-  | "(*@"   { read lexbuf }
+  | "(*@"   { state := SPEC; read lexbuf }
   | eof     { EOF }
-  | _       { read_code lexbuf } *)
-rule read =
+  | newline {  next_line lexbuf; read_code lexbuf }
+  | _       { 
+    (* print_string (Lexing.lexeme lexbuf);  *)
+    read_code lexbuf }
+and read =
   parse
   | white  { read lexbuf }  (* skip blanks *)
   | newline {  next_line lexbuf; read lexbuf }
   | "//"   { comment lexbuf }
-  (* | "*)"   { read_code lexbuf } *)
+  | "@*)"   { state := CODE; read_code lexbuf }
   | '{'    { LEFT_BRACKET }
   | '}'    { RIGHT_BRACKET }
   | '['    { LEFT_SQUARE }
@@ -69,3 +77,11 @@ and comment =
   | newline {  next_line lexbuf; read lexbuf }
   | eof     { EOF }
   | _       { comment lexbuf }
+
+
+{
+  let lexer lb =
+    match !state with
+      CODE -> read_code lb
+    | SPEC -> read lb
+}

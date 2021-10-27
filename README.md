@@ -11,13 +11,13 @@
   - first implemented as user declared, then find ways to automate it
   > prefer with explicit instantiation, because it fits the design of user-defined predicate
   - implemented by adding an extra constraint to the solver
+- [x] Assertion parser
 - if structure
   - add bool type to the assertion language
 - ADT, match structure
 - refine the disjunctive normal form reasoning
 - predicate system to support recursive reasoning
 - introduce separation logic
-- Assertion parser
 
 - discriminate between pvar and lvar in substitution
 - alpha renaming everywhere (e.g. div.ml)

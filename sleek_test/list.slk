@@ -2,6 +2,14 @@ pred fact<n,r> == n = 0 & r = 1
     or self::fact<n-1,r2>  & r = r2 * n
     inv n >= 0.
 
-checkentail true |- x::fact<0,1>.
+checkentail true |- x::fact<4,24>.
 
 checkentail x::fact<n-1, w> & r = w * n & n > 0 |- x::fact<n,r>.
+
+relation factP(int n, int r) == 
+(n = 0 & r = 1
+| (n > 0 & factP(n-1, z) & r = z * n)).
+
+checkentail true |- factP(4,24).
+
+checkentail factP(n, w) |- factP(n,w).

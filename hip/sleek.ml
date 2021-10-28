@@ -367,14 +367,18 @@ let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool =
   let candidates = make_prop_candidates env fname_sig_to_inst in
   print_assignment_groups candidates;
   let check_candidate candidate =
+    let inst_pre = instantiate_pure_preds candidate pre in
     let inst_post = instantiate_pure_preds candidate post in
+
+
     let cfg = [("model", "true"); ("proof", "true")] in
     let ctx = (mk_context cfg) in
     let goal = Goal.mk_goal ctx true true true in 
 
-    let impl_formula = make_goal ctx pre inst_post in
+    let impl_formula = make_goal ctx inst_pre inst_post in
 
     Goal.add goal [impl_formula];
+    print_endline (Z3.Expr.to_string impl_formula);
     solver_check_bool ctx goal []
   in
 

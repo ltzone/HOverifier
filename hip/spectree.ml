@@ -457,8 +457,8 @@ let instantiate_preds fname assign pure_preds : pure_pred list =
   List.concat_map (instantiate_pred fname assign) pure_preds
 
 let instantiate_pure_preds fname_assignment pure_preds =
-  if List.length (fname_assignment) > 0 then
+  (* if List.length (fname_assignment) > 0 then
     print_endline (logical_proposition_to_string (snd (List.nth ( fname_assignment) 0)))
-  else ();
+  else (); *)
   
   List.fold_right (fun (fname, (ass:logical_proposition)) pred -> instantiate_preds fname ass pred) fname_assignment pure_preds

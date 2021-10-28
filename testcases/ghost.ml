@@ -1,8 +1,21 @@
+(* 
+foo :: (Bool -> Int ) -> ()
+foo f = assert (f True == f False)
+
+foo :: n:Int -> (Bool -> SInt n) -> ()
+
+foo :: [n:Int] -> (Bool -> SInt n) -> ()
+
+
+verrify: 
+[foo (\z -> 1)] meets the condition in [assert]
+*)
+
+
 let foo (f: int -> int) = 
   if f 2 = f 4 then 1 else 0
 (*@
 declare foo(f)
-// given fpure(int)
 // implicit global n
 requires { true with
     f(b) |= { true } *->:r { n = r } }
@@ -24,6 +37,10 @@ declare test()
 requires { true }
 ensures[res] { res = 1 }
 @*)
+
+
+
+
 
 
 

@@ -143,9 +143,23 @@ let logical_proposition_to_expr ctx fname {pargs; pbody; _} : Expr.expr =
   let ex_vars = list_diff (VarSet.elements (fvars_of_pures pbody)) arg_list in
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
   forall_formula_of ctx arg_list 
-    (Boolean.mk_eq ctx (FuncDecl.apply fun_decl var_list) 
-      (exists_formula_of ctx ex_vars (pure_preds_to_expr ctx pbody)))
+    (Boolean.mk_eq ctx 
+      (exists_formula_of ctx ex_vars (pure_preds_to_expr ctx pbody))
+      (FuncDecl.apply fun_decl var_list) 
+      )
 
+
+let logical_proposition_to_expr_imply ctx fname {pargs; pbody; _} : Expr.expr =
+  let arg_list = List.map fst pargs in
+  let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
+  let var_list = List.map (encode_arg ctx) pargs in
+  let ex_vars = list_diff (VarSet.elements (fvars_of_pures pbody)) arg_list in
+  let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
+  forall_formula_of ctx arg_list 
+    (Boolean.mk_implies ctx 
+      (exists_formula_of ctx ex_vars (pure_preds_to_expr ctx pbody))
+      (FuncDecl.apply fun_decl var_list) 
+      )
 
 (* 
 z3 Cannot synthesize a fpure itself!
@@ -195,6 +209,32 @@ let solver_check_bool ctx goal (cand: prop_candidates) =
       Printf.printf "Model: \n%s\n" (Model.to_string m);
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; false
+
+
+
+let solver_check_bool_imply ctx goal (cand: prop_candidates) =
+  let solver = (Solver.mk_simple_solver ctx) in
+    let f e = 
+      (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
+    Solver.add solver [ Boolean.mk_not ctx e ] in
+      ignore (List.map f (Goal.get_formulas goal)) ;
+    List.iter (fun (fname, fbody) -> 
+      Solver.add solver
+      [logical_proposition_to_expr_imply ctx fname fbody]) cand;
+    let q = (Solver.check solver []) in
+      if q != SATISFIABLE then true
+      else
+        let m = (Solver.get_model solver) in    
+        match m with 
+    | None -> 
+      raise (TestFailedException "")
+    | Some (m) -> 
+      Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
+      (Printf.printf "Entailment fail\n") ;
+      Printf.printf "Model: \n%s\n" (Model.to_string m);
+      let n = (Model.get_const_decls m) in    
+        List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; false
+        
 
 let var_quantifier_of_spec (spec: fun_signature) : logical_var list * logical_var list =
   let pre = spec.fpre.pure in
@@ -377,19 +417,24 @@ let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool =
   let candidates = make_prop_candidates env fname_sig_to_inst in
   print_assignment_groups candidates;
   let check_candidate candidate =
-    let inst_pre = instantiate_pure_preds candidate pre in
-    let inst_post = instantiate_pure_preds candidate post in
+    (* let candidate_constraints = List.map (fun (inst_name, candidate) ->
+        logical_proposition_to_expr_imply ctx inst_name candidate
+    ) candidate in *)
+
+    
+    (* let inst_pre = instantiate_pure_preds candidate pre in *)
+    (* let inst_post = instantiate_pure_preds candidate post in *)
 
 
     let cfg = [("model", "true"); ("proof", "true")] in
     let ctx = (mk_context cfg) in
     let goal = Goal.mk_goal ctx true true true in 
 
-    let impl_formula = make_goal ctx inst_pre inst_post (env.prog_vars) in
+    let impl_formula = make_goal ctx pre post (env.prog_vars) in
 
     Goal.add goal [impl_formula];
     print_endline (Z3.Expr.to_string impl_formula);
-    solver_check_bool ctx goal []
+    solver_check_bool_imply ctx goal candidate
   in
 
   let feasible_candidates =

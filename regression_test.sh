@@ -1,0 +1,8 @@
+dune exec ./main.exe callchain | grep "failed\|success"
+dune exec ./main.exe compose | grep "failed\|success"
+dune exec ./main.exe div | grep "failed\|success"
+dune exec ./main.exe double | grep "failed\|success"
+dune exec ./main.exe ghost | grep "failed\|success"
+dune exec ./main.exe subsumption | grep "failed\|success"
+dune exec ./main.exe testif | grep "failed\|success"
+dune exec ./main.exe trivial | grep "failed\|success"

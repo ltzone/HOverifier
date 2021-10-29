@@ -20,6 +20,12 @@ let list_diff a b =
   let a_diff_b = VarSet.diff a_set b_set in
   VarSet.elements a_diff_b
 
+let list_union a b =
+  let a_set = VarSet.of_list a in
+  let b_set = VarSet.of_list b in
+  let a_union_b = VarSet.union a_set b_set in
+  VarSet.elements a_union_b
+
 let list_intersect a b =
   let a_set = VarSet.of_list a in
   let b_set = VarSet.of_list b in
@@ -256,7 +262,10 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
 
   let spec1_all, spec1_ex = var_quantifier_of_spec fun1 in
   let spec2_all, spec2_ex = var_quantifier_of_spec fun2 in
-  let arg_all = fun1.fvar in
+  let fvar_pre = VarSet.elements (fvars_of_pures pre) in
+  let spec1_all = list_diff spec1_all fvar_pre in
+  let spec2_all = list_diff spec2_all fvar_pre in
+  let arg_all = list_union fvar_pre fun1.fvar in
   let spec1_all = list_diff spec1_all arg_all in
   let spec2_all = list_diff spec2_all arg_all in
   let shared_ex = list_intersect spec1_ex spec2_ex in
@@ -307,10 +316,11 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
     Inst feasible_candidates
 )
 
-let make_goal ctx pre post =
+let make_goal ctx pre post prog_vars =
 
-  let pre_fvs = fvars_of_pures pre in
-  let post_fvs = fvars_of_pures post in
+  let forall_prog_vs = VarSet.of_list prog_vars in
+  let pre_fvs = VarSet.diff (fvars_of_pures pre) forall_prog_vs in
+  let post_fvs = VarSet.diff (fvars_of_pures post) forall_prog_vs in
   let post_exs = VarSet.diff post_fvs pre_fvs in 
   let forall_vars = VarSet.elements pre_fvs in
   let exists_vars = VarSet.elements post_exs in 
@@ -350,10 +360,9 @@ let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool =
   let ctx = (mk_context cfg) in
   let goal = Goal.mk_goal ctx true true true in 
 
-  let impl_formula = make_goal ctx pre post in
-  let quanti_impl_formula = forall_formula_of ctx (env.prog_vars) impl_formula in 
+  let impl_formula = make_goal ctx pre post (env.prog_vars) in
 
-  Goal.add goal [quanti_impl_formula];
+  Goal.add goal [impl_formula];
   let res = solver_check_bool ctx goal [] in
   if res then true else 
 
@@ -376,7 +385,7 @@ let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool =
     let ctx = (mk_context cfg) in
     let goal = Goal.mk_goal ctx true true true in 
 
-    let impl_formula = make_goal ctx inst_pre inst_post in
+    let impl_formula = make_goal ctx inst_pre inst_post (env.prog_vars) in
 
     Goal.add goal [impl_formula];
     print_endline (Z3.Expr.to_string impl_formula);

@@ -5,6 +5,13 @@ module Printast = Frontend.Printast
 module Parsetree = Frontend.Parsetree
 open Spectree
 
+let add_constraint_pure (acc_pure) (pred: pure_pred)  =
+  List.map (fun preds -> And (pred, preds)) acc_pure
+
+
+let add_constraint (acc: pred_normal_form) (pred: pure_pred) : pred_normal_form =
+  { acc with pure= List.map (fun preds -> And (pred, preds)) (acc.pure) }
+
 let print_endline x = flush_all (); print_endline x; flush_all ()
 
 (* let rec repeat_try f env (candidates:'a)  =
@@ -175,7 +182,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
       List.map (fun env ->
         env, new_anchor, {
           (* add pre_cond to post_cond and produce the accumulated condition *)
-          pure= List.concat_map (fun (preds) -> (
+          (* pure= List.concat_map (fun (preds) -> (
             let fpost_anchor, fpost_dnf = spec.fpost in
             let fpost_ass = preds_and_pred fpost_dnf.pure preds in
             let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
@@ -183,7 +190,14 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
             let conj_res = preds_and_pred post_subst_env preds in
             let subst_res = subst_pure_preds_list spec.fvar args conj_res in
             subst_res)
-          ) pre_cond;
+          ) pre_cond; *)
+          pure= 
+            (let fpost_anchor, fpost_dnf = spec.fpost in
+            let fpost_ass = fpost_dnf.pure  in
+            let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
+            let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
+            let subst_res = subst_pure_preds_list spec.fvar args post_subst_env in
+            List.concat_map (add_constraint_pure pre_cond) subst_res );
           spec = []
         }) envs
         
@@ -219,9 +233,6 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
         fpost=(fst  spec.fpost, subst_pred_normal_forms applied_args args (snd spec.fpost));
       }]
     }]
-
-let add_constraint (acc: pred_normal_form) (pred: pure_pred) : pred_normal_form =
-  { acc with pure= List.map (fun preds -> And (pred, preds)) (acc.pure) }
 
 
 let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.expression) : 
@@ -417,13 +428,34 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
   infer_of_expression env spec.fpre body |>
   (
   List.fold_left (fun last_res (inferred_env, post_anchor, inferred_post) ->
-    let _ = inferred_env in
-    if last_res then true else
-    let normalized_post = ( (snd spec.fpost).pure ) in
-    let substed_post = subst_pure_pred_list (fst spec.fpost) post_anchor normalized_post in
-      if (Sleek.check_pure inferred_env ( inferred_post.pure ) substed_post) then true else
-        (false)
-  ) false
+    (* normalize specs *)
+    let inferred_env = 
+      Env.add_specs_to_fn post_anchor inferred_post.spec inferred_env in
+    let inferred_post = { inferred_post with spec = [] } in
+
+    (if last_res then true else
+    (let substed_post = subst_pred_normal_form (fst spec.fpost) post_anchor (snd spec.fpost) in
+    let post_pure = ( substed_post.pure ) in
+    let post_spec = ( substed_post.spec ) in
+
+
+    let pure_check = Sleek.check_pure inferred_env ( inferred_post.pure ) post_pure in
+
+    let check_post_spec (expect_spec:fun_signature) : bool = 
+      (let exist_spec = Env.find_spec expect_spec.fname inferred_env in
+      (match exist_spec with 
+      |  None -> failwith ("No spec exist for expected return spec named " ^ expect_spec.fname)
+      | Some exist_spec ->
+          (let valid_exist_spec = List.filter 
+              (fun spec -> match Sleek.check_spec_sub env inferred_post.pure expect_spec spec with
+               | Success -> true | _ -> false
+              ) exist_spec in
+            List.length valid_exist_spec != 0))) in
+
+    let spec_check = List.length (List.filter check_post_spec post_spec) = List.length post_spec in 
+      if (pure_check && spec_check) then true else
+        (false))
+  )) false
   )
   (* let inferred_env, post_anchor, inferred_post = infer_of_expression env spec.fpre body in
     let _ = fn_name, formals, inferred_post, post_anchor, inferred_env in

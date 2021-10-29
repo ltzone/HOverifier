@@ -38,7 +38,7 @@ declare quad_fo(x)
 
 
 
-let once f x = f x
+let once f x = f x 
 
 (*@
 declare once(f, x)

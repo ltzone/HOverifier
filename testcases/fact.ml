@@ -3,7 +3,7 @@ let rec fact n =
 
 (*@
 declare fact(n)
-// given factP(int,int)
+given factP(int,int)
 requires { 0<=n }
 ensures[res] { factP(n,res) }
 

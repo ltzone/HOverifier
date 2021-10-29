@@ -16,7 +16,7 @@ ensures  [f]{ true with
 @*)
 
 
-let div_by_one' = div 1
+let div_by_one' x = div 1 x
 (*@
 declare div_by_one'(x)
 requires    { true } 
@@ -34,7 +34,7 @@ ensures  [r]{ Q(x,m) & Q(m,r) }
 
 
 
-let div_by_one_star x = twice div_by_one' x
+let div_by_one_star x = twice div_by_one x
 (*@
 declare div_by_one_star(x)
 requires    { true }

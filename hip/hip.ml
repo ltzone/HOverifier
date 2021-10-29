@@ -5,6 +5,8 @@ module Printast = Frontend.Printast
 module Parsetree = Frontend.Parsetree
 open Spectree
 
+let print_endline x = flush_all (); print_endline x; flush_all ()
+
 (* let rec repeat_try f env (candidates:'a)  =
   List.fold_right
   (fun candidate last_res ->
@@ -143,11 +145,11 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
     (* full application *)
     
     ((let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
+
     let pure_to_check = subst_pre_to_check.pure in
     let spec_to_check = subst_pre_to_check.spec in
 
     List.iter (fun v -> string_of_fun_spec v |> print_endline) spec_to_check;
-
 
   let check_fun_status, env = check_fun env args spec.fvar spec_to_check pure_to_check  in
   let check_bool = Sleek.check_pure env (pre_cond) (pure_to_check) in
@@ -236,8 +238,8 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
   (* II: forward execution on res *)
   let res :  (env * logical_var * pred_normal_form)  list=
   match expr.pexp_desc with 
-  | Pexp_fun (_, _, _ (*pattern*), expr) -> 
-      infer_of_expression env acc expr 
+  | Pexp_fun (_, _, {ppat_desc=Ppat_var {txt=arg_name;_};_} (*pattern*), expr) -> 
+      infer_of_expression (Env.add_var_name arg_name env) acc expr 
       (* Note:
          we assume that lambda expressions only occurs at the beginning of a let declaration,
          therefore we can safely ignore and proceed the forward verification.
@@ -268,7 +270,27 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
     let var_name = string_of_ident ident in
     (* let fresh_name = Env.get_fresh_res_name env in *)
     (* env, fresh_name, subst_pred_normal_form var_name fresh_name acc *)
+    if List.find_opt (String.equal var_name) (env.prog_vars) != None then
       [( env, var_name, acc ) ]
+    else (
+      let matched_spec = Env.find_spec var_name env in
+      match matched_spec with | None -> failwith ("the identifier " ^ var_name ^ " is not defined") | Some matched_spec ->
+      matched_spec |> List.map
+      (fun {fvar; fpre; fpost ; _} ->
+        if List.length fvar != 0 then ( env, var_name, acc )
+        else
+          (* the identifier corresponds to a value that have been defined earlier,
+             if the pre-condition satisfies, we should further evaluate it
+          *)
+          (* The argument list is 0, so we can safely check only the pure part, 
+            there should be no spec part describing the funtion arguments *)
+          if Sleek.check_pure env acc.pure fpre.pure then
+            let fresh_name = Env.get_fresh_res_name env in
+            let subst_post = subst_pred_normal_form (fst fpost) fresh_name (snd fpost) in
+            ( Env.add_specs_to_fn fresh_name subst_post.spec env, fresh_name, { subst_post with spec=[]} )
+          else ( env, var_name, acc )
+      )
+    )
 
   | Pexp_apply (f_exp, arg_list) 
     (* for application: [expression * (arg_label * expression) list]
@@ -373,7 +395,8 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
     List.iteri
     (fun i res -> 
         print_endline ("hip[" ^ string_of_int i ^"]: " ^ 
-            match res with _, anchor, res ->  
+            match res with env, anchor, res ->  
+              "[" ^ (String.concat "," (env.prog_vars)) ^ "]" ^
               anchor ^ " : " ^  string_of_pred_normal_form (res))) res; res
 
 (* Check for each let function declaration *)

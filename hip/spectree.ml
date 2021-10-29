@@ -366,6 +366,8 @@ fname_assignment: (logical_proposition) SMap.t;
    The current assignment of fnames, no duplicate
 *)
 
+prog_vars: program_var list;
+
 ftype_context: (exp_type list) SMap.t
 (* when simple SMT solving fails,
    try to find a proper fname assignment
@@ -391,6 +393,7 @@ let empty = {
   predicates = [];
   fname_assignment = SMap.empty;
   ftype_context = SMap.empty;
+  prog_vars = [];
 }
 
 let insted_preds env = List.map fst (SMap.bindings env.fname_assignment)
@@ -424,16 +427,22 @@ let add_fn fname specs env =
 
 let add_spec_to_fn fname spec env = 
   { env with specs = SMap.update fname (function None -> Some [spec]
-                              | Some specs -> Some (spec::specs)) env.specs }
+                              | Some specs -> Some (spec::specs)) env.specs }                          
 
+let add_specs_to_fn fname specs env = 
+  List.fold_right (add_spec_to_fn fname) specs env
 
 let find_spec fname env = SMap.find_opt fname env.specs
 
-let get_fresh_res_name env = env.res_index := !(env.res_index) + 1; "_r" ^ string_of_int !(env.res_index)
+let get_fresh_res_name env = 
+  flush_all (); print_endline "new fresh name generated"; flush_all ();
+  env.res_index := !(env.res_index) + 1; "_r" ^ string_of_int !(env.res_index)
 
 let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
 
 let available_names env = List.map fst (SMap.bindings (env.specs))
+
+let add_var_name name env = { env with prog_vars = name :: env.prog_vars }
 
 end
 

@@ -351,8 +351,9 @@ let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool =
   let goal = Goal.mk_goal ctx true true true in 
 
   let impl_formula = make_goal ctx pre post in
+  let quanti_impl_formula = forall_formula_of ctx (env.prog_vars) impl_formula in 
 
-  Goal.add goal [impl_formula];
+  Goal.add goal [quanti_impl_formula];
   let res = solver_check_bool ctx goal [] in
   if res then true else 
 

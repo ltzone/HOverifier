@@ -19,5 +19,4 @@ let bar z = goo (foo z) + goo (foo z)
 given 
 requires { true }
 ensures[p] { p = 2 * z + 8 }
-
 @*)

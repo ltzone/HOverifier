@@ -12,7 +12,7 @@ verrify:
 *)
 
 
-let foo (f: int -> int) = 
+let foo f= 
   if f 2 = f 4 then 1 else 0
 (*@
 declare foo(f)
@@ -24,7 +24,7 @@ ensures[res] { res = 1 }
 
 (*@ pred foo_inst(p:int) |= p = 5  @*)
 
-let g (b: int) = 5
+let g b = 5
 (*@
 declare g(b)
 requires { true }

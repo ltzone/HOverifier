@@ -43,7 +43,7 @@ let test () =
 
       let fname = (name_of_prog prog) in
       Format.printf "Verifying %s\n" fname;
-    (* Format.printf "%a@." Printast.implementation [prog]; *)
+    Format.printf "%a@." Printast.implementation [prog];
       try
         if infer_of_program env prog 
         then

@@ -1,3 +1,8 @@
+- GIVEN/ NOT GIVEN predicates
+- add types to predicates, Q(bool, int->int)...
+- 
+
+
 ## TODO list
 
 - [x] what about a nested function specification?

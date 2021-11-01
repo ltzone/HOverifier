@@ -6,5 +6,5 @@
 
  ; (executable
  ; (name playz3)
- ; (libraries hiphop frontend utils z3 specs)
+ ; (libraries hiphop frontend utils z3)
  ; (link_flags -cc g++))

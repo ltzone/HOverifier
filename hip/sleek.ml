@@ -115,7 +115,7 @@ let solver_wrapper ctx goal : bool =
     let f e = (Solver.add solver [ Boolean.mk_not ctx e ]) in
       ignore (List.map f (Goal.get_formulas goal)) ;
     let q = (Solver.check solver []) in
-      if q != SATISFIABLE then 
+      if q == UNSATISFIABLE then 
         (Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
         (Printf.printf "Entailment success\n") ; true)
       else
@@ -197,7 +197,7 @@ let solver_check_bool ctx goal (cand: prop_candidates) =
       Solver.add solver
       [logical_proposition_to_expr ctx fname fbody]) cand;
     let q = (Solver.check solver []) in
-      if q != SATISFIABLE then true
+      if q == UNSATISFIABLE then true
       else
         let m = (Solver.get_model solver) in    
         match m with 
@@ -219,10 +219,11 @@ let solver_check_bool_imply ctx goal (cand: prop_candidates) =
     Solver.add solver [ Boolean.mk_not ctx e ] in
       ignore (List.map f (Goal.get_formulas goal)) ;
     List.iter (fun (fname, fbody) -> 
+      print_endline (Expr.to_string (logical_proposition_to_expr_imply ctx fname fbody));
       Solver.add solver
       [logical_proposition_to_expr_imply ctx fname fbody]) cand;
     let q = (Solver.check solver []) in
-      if q != SATISFIABLE then true
+      if q == UNSATISFIABLE then true
       else
         let m = (Solver.get_model solver) in    
         match m with 

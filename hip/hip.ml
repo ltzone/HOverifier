@@ -179,8 +179,10 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
       | _ -> [ env ] in
 
       (let new_anchor = Env.get_fresh_res_name env in
+      let new_anchor_ty = snd (fst spec.fpost) in
       List.map (fun env ->
-        env, new_anchor, {
+        Env.add_vtype env new_anchor new_anchor_ty, 
+        new_anchor, {
           (* add pre_cond to post_cond and produce the accumulated condition *)
           (* pure= List.concat_map (fun (preds) -> (
             let fpost_anchor, fpost_dnf = spec.fpost in
@@ -259,13 +261,15 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
 
   | Pexp_construct ({txt=Lident "true";_} , None) ->
       let fresh_anchor = Env.get_fresh_res_name env in
-      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Int 1)) in 
-      [ (env, fresh_anchor, add_constraint acc new_constraint) ]
+      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Bool true)) in 
+      let new_env = Env.add_vtype env fresh_anchor Bool in
+      [ (new_env, fresh_anchor, add_constraint acc new_constraint) ]
 
   | Pexp_construct ({txt=Lident "false";_} , None) ->
       let fresh_anchor = Env.get_fresh_res_name env in
-      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Int 0)) in 
-      [ (env, fresh_anchor, add_constraint acc new_constraint) ]
+      let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Bool false)) in 
+      let new_env = Env.add_vtype env fresh_anchor Bool in
+      [ (new_env, fresh_anchor, add_constraint acc new_constraint) ]
 
   | Pexp_constant (Pconst_integer (num, sufix)) ->
       (* for constant x, 
@@ -274,7 +278,8 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       let int_val = int_of_string (num ^ combined_num_string) in
       let fresh_anchor = Env.get_fresh_res_name env in
       let new_constraint = Arith (Eq, Pvar fresh_anchor,  Const (Int int_val)) in 
-      [ (env, fresh_anchor, add_constraint acc new_constraint) ]
+      let new_env = Env.add_vtype env fresh_anchor Int in
+      [ (new_env, fresh_anchor, add_constraint acc new_constraint) ]
 
   | Pexp_ident  {txt=ident;_} -> 
     (* for variable x, just let the anchor to be x, which is equivalent to
@@ -282,9 +287,10 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
     let var_name = string_of_ident ident in
     (* let fresh_name = Env.get_fresh_res_name env in *)
     (* env, fresh_name, subst_pred_normal_form var_name fresh_name acc *)
-    if List.find_opt (String.equal var_name) (env.prog_vars) != None then
-      [( env, var_name, acc ) ]
-    else (
+   (match List.find_opt (String.equal var_name) (env.prog_vars) with 
+    | Some _ ->  (
+      [( env, var_name, acc ) ])
+    | None -> (
       let matched_spec = Env.find_spec var_name env in
       match matched_spec with | None -> failwith ("the identifier " ^ var_name ^ " is not defined") | Some matched_spec ->
       matched_spec |> List.map
@@ -298,11 +304,13 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
             there should be no spec part describing the funtion arguments *)
           if Sleek.check_pure env acc.pure fpre.pure then
             let fresh_name = Env.get_fresh_res_name env in
+            let fresh_ty = snd (fst fpost)in
+            let new_env = Env.add_vtype env var_name fresh_ty in
             let subst_post = subst_pred_normal_form (fst (fst fpost)) fresh_name (snd fpost) in
-            ( Env.add_specs_to_fn fresh_name subst_post.spec env, fresh_name, { subst_post with spec=[]} )
+            ( Env.add_specs_to_fn fresh_name subst_post.spec new_env, fresh_name, { subst_post with spec=[]} )
           else ( env, var_name, acc )
       )
-    )
+    ))
 
   | Pexp_apply (f_exp, arg_list) 
     (* for application: [expression * (arg_label * expression) list]
@@ -382,12 +390,12 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       let f_acc = {pure=pre_cond; spec=[]} in
 
       (* Step 1: eval two branches *)
-      let true_cond = add_constraint f_acc (Arith (Eq, Pvar bname, Const (Int 1))) in
+      let true_cond = add_constraint f_acc (Arith (Eq, Pvar bname, Const (Bool true))) in
       (infer_of_expression env true_cond e1) |>
       List.concat_map
       (fun (env, bname_t, f_acc_t) -> 
 
-      let false_cond = add_constraint f_acc (Arith (Eq, Pvar bname, Const (Int 0))) in
+      let false_cond = add_constraint f_acc (Arith (Eq, Pvar bname, Const (Bool false))) in
       (infer_of_expression env false_cond e2)  |>
       List.concat_map
       (fun (env, bname_f, f_acc_f) ->
@@ -395,9 +403,11 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
 
       (* Step 2: unify post_conditions *)
       let unified_anchor = Env.get_fresh_res_name env in
+      let unified_anchor_ty = Env.lookup_vtype env bname_t in
+      let new_env = Env.add_vtype env unified_anchor unified_anchor_ty in
       let f_acc_t = subst_pred_normal_form bname_t unified_anchor f_acc_t in
       let f_acc_f = subst_pred_normal_form bname_f unified_anchor f_acc_f in
-      [(env, unified_anchor, {pure= f_acc_t.pure @ f_acc_f.pure; spec=f_acc_t.spec @ f_acc_f.spec })] )))
+      [(new_env, unified_anchor, {pure= f_acc_t.pure @ f_acc_f.pure; spec=f_acc_t.spec @ f_acc_f.spec })] )))
 
 
   
@@ -425,7 +435,7 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
     (* match function_spec body with
     | None -> default_spec
     | Some (pre, post) -> (normalSpec pre, normalSpec post) *)
-          
+  let env = List.fold_left (fun old_env (vname, vty) -> Env.add_vtype old_env vname vty) env spec.fvar in
   infer_of_expression env spec.fpre body |>
   (
   List.fold_left (fun last_res (inferred_env, post_anchor, inferred_post) ->

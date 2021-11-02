@@ -43,9 +43,8 @@ let eq_sig = {
   fvar=["p1", Int ; "p2", Int ];
   pnames=[];
   fpre={pure=[(True)]; spec=[]};
-  fpost=("r", Int), {pure=[
-    And ( Arith (Eq, Pvar "r", Const (Int 1)), Arith (Eq, Pvar "p1", Pvar "p2"));
-    And ( Arith (Eq, Pvar "r", Const (Int 0)), Neg (Arith (Eq, Pvar "p1", Pvar "p2")))
+  fpost=("r", Bool), {pure=[
+    Arith (Eq, Pvar "r", Op (Eqb, Pvar "p1", Pvar "p2"));
   ]; spec=[]};
 }
 

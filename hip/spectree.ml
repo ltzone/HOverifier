@@ -11,7 +11,7 @@ type program_var = string
 type constant = Int of int 
 | Bool of bool
 
-type bin_operator = Plus | Minus | Mult
+type bin_operator = Plus | Minus | Mult | Eqb
 
 type logical_exp = Pvar of program_var 
 | Lvar of logical_var 
@@ -94,7 +94,7 @@ let rec logical_exp_to_string = function
 | Const (Int i) -> string_of_int i
 | Const (Bool i) -> string_of_bool i
 | Op (oper, t1, t2) ->
-    let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" in
+    let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" | Eqb -> "==" in
     String.concat "" ["("; logical_exp_to_string t1; op_str; logical_exp_to_string t2; ")"]
 
 
@@ -377,7 +377,7 @@ fname_assignment: (logical_proposition) SMap.t;
 
 prog_vars: program_var list;
 
-ftype_context: (exp_type list) SMap.t
+ftype_context: (exp_type list) SMap.t;
 (* when simple SMT solving fails,
    try to find a proper fname assignment
    
@@ -392,6 +392,7 @@ ftype_context: (exp_type list) SMap.t
    
    *)
 (* fnames : SSet.t; *)
+vtype_context: exp_type SMap.t
 }
 
 
@@ -402,6 +403,7 @@ let empty = {
   predicates = [];
   fname_assignment = SMap.empty;
   ftype_context = SMap.empty;
+  vtype_context = SMap.empty;
   prog_vars = [];
 }
 
@@ -411,6 +413,17 @@ let lookup_ftype env fname =
   match SMap.find_opt fname env.ftype_context with
   | Some v -> fname, v
   | None -> failwith ("Predicate type not found for " ^ fname)
+
+let lookup_vtype env vname =
+  match SMap.find_opt vname env.vtype_context with
+  | Some v_ty -> v_ty
+  | None -> failwith ("Variable type not found for " ^ vname)
+
+let add_vtype env vname vty =
+  match SMap.find_opt vname env.vtype_context with
+  | Some vty' -> 
+      if vty' = vty then env else failwith (vname ^ " is declared to have type " ^ string_of_ty vty ^ " but has already been assigned with type " ^ string_of_ty vty')
+  | None -> { env with vtype_context=SMap.add vname vty env.vtype_context }
 
 let add_inst env inst_name inst = 
   match SMap.find_opt inst_name env.fname_assignment with
@@ -452,6 +465,9 @@ let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
 let available_names env = List.map fst (SMap.bindings (env.specs))
 
 let add_var_name name env = { env with prog_vars = name :: env.prog_vars }
+
+let vtypes_to_string env =
+  String.concat "," (List.map (fun (v, vty) -> v ^ ":" ^ string_of_ty vty) (SMap.bindings env.vtype_context))
 
 end
 

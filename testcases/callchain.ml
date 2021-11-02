@@ -1,22 +1,22 @@
 let foo x = x + 2
-(*@ declare foo(x)
+(*@ declare foo(x:int)
 given 
 requires { true }
-ensures[r] { r = x + 2 }
+ensures[r:int] { r = x + 2 }
 @*)
 
 
 let goo w = w + 2
-(*@ declare goo(w)
+(*@ declare goo(w:int)
 given 
 requires { true }
-ensures[q] { w + 2 = q }
+ensures[q:int] { w + 2 = q }
 @*)
 
 let bar z = goo (foo z) + goo (foo z) 
 (* + foo (goo z) *)
-(*@ declare bar(z)
+(*@ declare bar(z:int)
 given 
 requires { true }
-ensures[p] { p = 2 * z + 8 }
+ensures[p:int] { p = 2 * z + 8 }
 @*)

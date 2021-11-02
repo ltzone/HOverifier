@@ -9,7 +9,7 @@ type program_var = string
 
 
 type constant = Int of int 
-(* | Bool of bool *)
+| Bool of bool
 
 type bin_operator = Plus | Minus | Mult
 
@@ -21,7 +21,7 @@ type logical_exp = Pvar of program_var
 
 
 type exp_type = Int 
-(* | Bool *)
+| Bool
 
 type fun_id = string
 
@@ -46,9 +46,9 @@ type pred_normal_form = {
 and fun_signature = {
   fname: program_var;
   pnames: fun_id list; (* can only occurs on top level *)
-  fvar: program_var list;
+  fvar: (program_var * exp_type) list;
   fpre: pred_normal_form;
-  fpost: program_var * pred_normal_form;
+  fpost:(program_var * exp_type) * pred_normal_form;
 }
 (* basic term *)
 
@@ -92,7 +92,7 @@ let rec logical_exp_to_string = function
 | Lvar v -> v
 (* | Fun (v, vs) -> String.concat "" ([v;"("] @ [(String.concat "," (List.map logical_exp_to_string vs))] @ [")"] ) *)
 | Const (Int i) -> string_of_int i
-(* | Const (Bool i) -> string_of_bool i *)
+| Const (Bool i) -> string_of_bool i
 | Op (oper, t1, t2) ->
     let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" in
     String.concat "" ["("; logical_exp_to_string t1; op_str; logical_exp_to_string t2; ")"]
@@ -118,6 +118,11 @@ match p with
 let pure_preds_to_string ps =
   String.concat " | " (List.map pure_pred_to_string ps)
 
+let string_of_ty = function
+| Int -> "int"
+| Bool -> "bool"
+
+
 let rec string_of_pred_normal_form {pure; spec} = 
   (String.concat " \\/ " (List.map (pure_pred_to_string)
     pure) ) ^ 
@@ -126,14 +131,12 @@ let rec string_of_pred_normal_form {pure; spec} =
       (String.concat "\n\t" (List.map string_of_fun_spec spec)))
 
 and string_of_fun_spec {fname; fvar; pnames; fpre; fpost} = 
-    fname ^ "(" ^ String.concat "," fvar ^ ")"
+    fname ^ "(" ^ String.concat "," (List.map (fun (fvar, ty) -> fvar ^ ":" ^ string_of_ty ty) fvar ) ^ ")"
     ^ "[" ^ String.concat "," pnames ^ "]" ^ "|= {" ^ 
-      string_of_pred_normal_form fpre ^ "} *->:" ^ fst fpost ^ " {"
+      string_of_pred_normal_form fpre ^ "} *->:" ^ fst (fst fpost) ^ ":" ^ string_of_ty (snd (fst fpost)) ^ " {"
       ^ string_of_pred_normal_form (snd fpost) ^"}"
 
-let string_of_ty = function
-| Int -> "int"
-(* | Bool -> "bool" *)
+
 
 let logical_proposition_to_string  {pname;  pargs;  pbody;} = 
   String.concat ""
@@ -174,7 +177,7 @@ let rec fill_logical_exp a (b:logical_exp) = function
 | Pvar v -> if String.equal v a then b else Pvar v
 | Lvar v -> if String.equal v a then b else Lvar v
 (* | Fun (v, vs) -> Fun (subst_str v, List.map (subst_logical_exp a b) vs) *)
-| Const (Int i) -> Const (Int i)
+| Const v -> Const v
 | Op (oper, t1, t2) -> Op (oper, fill_logical_exp a b t1, fill_logical_exp a b t2)
 
 
@@ -226,7 +229,7 @@ and subst_fun_signature a b fsig =
               fpre= subst_pred_normal_form a b fsig.fpre;
               fpost= (* TODO: alpha renaming *)
                 (match fsig.fpost with
-                anchor, fpost -> (if String.equal a anchor then b else anchor), 
+                anchor, fpost -> (if String.equal a (fst anchor) then (b, snd anchor) else anchor), 
                                   subst_pred_normal_form a b fpost );
               fname = if String.equal a fsig.fname then b else fsig.fname
   }
@@ -268,6 +271,12 @@ let rec subst_pred_normal_forms ax bx p =
     Free Variables
 ********************************
 ********************************)
+
+module VarTySet = Set.Make(struct
+  type t = string * exp_type
+
+  let compare v1 v2 = String.compare (fst v1) (fst v2)
+end)
 
 module VarSet = Set.Make(String)
 

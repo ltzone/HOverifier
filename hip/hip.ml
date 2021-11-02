@@ -151,14 +151,14 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
   if List.length args = List.length spec.fvar then
     (* full application *)
     
-    ((let subst_pre_to_check = subst_pred_normal_forms spec.fvar args spec.fpre in
+    ((let subst_pre_to_check = subst_pred_normal_forms (List.map fst spec.fvar) args spec.fpre in
 
     let pure_to_check = subst_pre_to_check.pure in
     let spec_to_check = subst_pre_to_check.spec in
 
     List.iter (fun v -> string_of_fun_spec v |> print_endline) spec_to_check;
 
-  let check_fun_status, env = check_fun env args spec.fvar spec_to_check pure_to_check  in
+  let check_fun_status, env = check_fun env args (List.map fst spec.fvar) spec_to_check pure_to_check  in
   let check_bool = Sleek.check_pure env (pre_cond) (pure_to_check) in
     if (check_bool) then
 (*       
@@ -194,9 +194,9 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
           pure= 
             (let fpost_anchor, fpost_dnf = spec.fpost in
             let fpost_ass = fpost_dnf.pure  in
-            let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
+            let post_subst = subst_pure_pred_list (fst fpost_anchor) new_anchor fpost_ass in
             let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
-            let subst_res = subst_pure_preds_list spec.fvar args post_subst_env in
+            let subst_res = subst_pure_preds_list (List.map fst spec.fvar) args post_subst_env in
             List.concat_map (add_constraint_pure pre_cond) subst_res );
           spec = []
         }) envs
@@ -224,13 +224,14 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
     let () = print_endline (string_of_int (List.length args)) in *)
     let applied_args, rem_args = 
         split_nth (List.length args) [] spec.fvar in
+    let applied_args_names = List.map fst applied_args in 
     [env, new_name, {
       (* pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ; *)
       pure= pre_cond ;
       spec= [{
         fname=new_name; fvar= rem_args; pnames=spec.pnames;
-        fpre=subst_pred_normal_forms applied_args args spec.fpre;
-        fpost=(fst  spec.fpost, subst_pred_normal_forms applied_args args (snd spec.fpost));
+        fpre=subst_pred_normal_forms applied_args_names args spec.fpre;
+        fpost=(fst  spec.fpost, subst_pred_normal_forms applied_args_names args (snd spec.fpost));
       }]
     }]
 
@@ -297,7 +298,7 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
             there should be no spec part describing the funtion arguments *)
           if Sleek.check_pure env acc.pure fpre.pure then
             let fresh_name = Env.get_fresh_res_name env in
-            let subst_post = subst_pred_normal_form (fst fpost) fresh_name (snd fpost) in
+            let subst_post = subst_pred_normal_form (fst (fst fpost)) fresh_name (snd fpost) in
             ( Env.add_specs_to_fn fresh_name subst_post.spec env, fresh_name, { subst_post with spec=[]} )
           else ( env, var_name, acc )
       )
@@ -434,7 +435,7 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
     let inferred_post = { inferred_post with spec = [] } in
 
     (if last_res then true else
-    (let substed_post = subst_pred_normal_form (fst spec.fpost) post_anchor (snd spec.fpost) in
+    (let substed_post = subst_pred_normal_form (fst (fst spec.fpost)) post_anchor (snd spec.fpost) in
     let post_pure = ( substed_post.pure ) in
     let post_spec = ( substed_post.spec ) in
 

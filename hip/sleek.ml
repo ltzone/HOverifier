@@ -59,6 +59,7 @@ let rec expr_to_expr ctx : logical_exp -> Expr.expr = function
         List.map (expr_to_expr ctx) vs  in
       Expr.mk_app ctx fun_decl fun_args *)
   | Const (Int n) -> Arithmetic.Integer.mk_numeral_i ctx n
+  | Const (Bool i) -> if i then Boolean.mk_true ctx else Boolean.mk_false ctx
   | Op (oper , t1, t2) -> 
       let z3_constr = match oper with 
                     | Plus -> Arithmetic.mk_add 
@@ -132,9 +133,11 @@ let solver_wrapper ctx goal : bool =
 
 let encode_ty ctx = function
  Int -> Arithmetic.Integer.mk_sort ctx
+| Bool -> Boolean.mk_sort ctx
 
 let encode_arg ctx = function
 | (v, Int) -> Arithmetic.Integer.mk_const_s ctx v
+| (v, Bool) -> Boolean.mk_const_s ctx v
 
 let logical_proposition_to_expr ctx fname {pargs; pbody; _} : Expr.expr =
   let arg_list = List.map fst pargs in
@@ -237,10 +240,10 @@ let solver_check_bool_imply ctx goal (cand: prop_candidates) =
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; false
         
 
-let var_quantifier_of_spec (spec: fun_signature) : logical_var list * logical_var list =
+let var_quantifier_of_spec (spec: fun_signature) : (logical_var ) list *  (logical_var) list =
   let pre = spec.fpre.pure in
   let post = (snd spec.fpost).pure in
-  let fvars = VarSet.of_list spec.fvar in
+  let fvars = VarSet.of_list (List.map fst spec.fvar) in
   let pre_fvs = fvars_of_pures pre in
   let post_fvs = fvars_of_pures post in
   let post_exs = VarSet.diff post_fvs pre_fvs in 
@@ -257,11 +260,11 @@ let rename_fun_args fun1 fun2 =
   {
   fun2 with
     fvar = fun1.fvar;
-    fpre = subst_pred_normal_forms (fun2.fvar) (fun1.fvar) fun2.fpre;
+    fpre = subst_pred_normal_forms (List.map fst fun2.fvar) (List.map fst fun1.fvar) fun2.fpre;
     fpost = (fst fun1.fpost ,
       let subst_ret = subst_pred_normal_form 
-        (fst fun2.fpost) (fst fun1.fpost) (snd fun2.fpost) in
-      subst_pred_normal_forms (fun2.fvar) (fun1.fvar) subst_ret)
+        (fst (fst fun2.fpost)) (fst (fst fun1.fpost)) (snd fun2.fpost) in
+      subst_pred_normal_forms (List.map fst fun2.fvar) (List.map fst fun1.fvar) subst_ret)
   }
 
 
@@ -306,7 +309,7 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
   let fvar_pre = VarSet.elements (fvars_of_pures pre) in
   let spec1_all = list_diff spec1_all fvar_pre in
   let spec2_all = list_diff spec2_all fvar_pre in
-  let arg_all = list_union fvar_pre fun1.fvar in
+  let arg_all = list_union fvar_pre (List.map fst fun1.fvar) in
   let spec1_all = list_diff spec1_all arg_all in
   let spec2_all = list_diff spec2_all arg_all in
   let shared_ex = list_intersect spec1_ex spec2_ex in

@@ -1,6 +1,6 @@
 - GIVEN/ NOT GIVEN predicates
 - add types to predicates, Q(bool, int->int)...
-- 
+- sanity check for type matching in variable substitution
 
 
 ## TODO list

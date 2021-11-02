@@ -56,9 +56,9 @@ let parse :=
     }
 
 let fun_sig_item :=
-| DECLARE ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, ID) ; RIGHT_BRACE ;
+| DECLARE ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ;
   REQUIRES ; LEFT_BRACKET;  pre = ass ; RIGHT_BRACKET;
-  ENSURES ; LEFT_SQUARE ; r = ID ; RIGHT_SQUARE ; LEFT_BRACKET;  post = ass ; RIGHT_BRACKET;
+  ENSURES ; LEFT_SQUARE ; r = arg_pair ; RIGHT_SQUARE ; LEFT_BRACKET;  post = ass ; RIGHT_BRACKET;
   { {
     fname = f;
     fvar = xs;
@@ -66,10 +66,10 @@ let fun_sig_item :=
     fpost = r, post;
     pnames =[];  
   }, [] }
-| DECLARE ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, ID) ; RIGHT_BRACE ;
+| DECLARE ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ;
   GIVEN; pred_tys = separated_list(COMMA, pred_ty_spec);
   REQUIRES ; LEFT_BRACKET;  pre = ass ; RIGHT_BRACKET;
-  ENSURES ; LEFT_SQUARE ; r = ID ; RIGHT_SQUARE ; LEFT_BRACKET;  post = ass ; RIGHT_BRACKET;
+  ENSURES ; LEFT_SQUARE ; r = arg_pair ; RIGHT_SQUARE ; LEFT_BRACKET;  post = ass ; RIGHT_BRACKET;
   { {
     fname = f;
     fvar = xs;
@@ -83,10 +83,11 @@ let pred_ty_spec :=
 
 let arg_pair :=
 | x = ID ; COLON ; y = type_name ; {x, y}
+| x = ID ; {x, Int}
 
 let type_name :=
 | TINT ; { (Int) }
-// | TBOOL ; { Bool }
+| TBOOL ; { Bool }
 
 let logical_item :=
 | PRED ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ; HASSPEC; preds=separated_list(OR, pure_clause) ;
@@ -135,13 +136,23 @@ let logical_expression :=
     { Op (Mult, x1, x2) }
 
 let spec_clause :=
-| f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, ID) ; RIGHT_BRACE ;
+| f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ;
   HASSPEC ; LEFT_BRACKET;  pre = ass ; RIGHT_BRACKET;
   PREPOST ; r = ID  ; LEFT_BRACKET;  post = ass ; RIGHT_BRACKET;
   { {
     fname = f;
     fvar = xs;
     fpre = pre;
-    fpost = r, post;
+    fpost = (r, Int), post;
+    pnames =[];  
+  } }
+| f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ;
+  HASSPEC ; LEFT_BRACKET;  pre = ass ; RIGHT_BRACKET;
+  PREPOST ; r = ID ; COLON ; ret_ty = type_name ; LEFT_BRACKET;  post = ass ; RIGHT_BRACKET;
+  { {
+    fname = f;
+    fvar = xs;
+    fpre = pre;
+    fpost = (r, ret_ty), post;
     pnames =[];  
   } }

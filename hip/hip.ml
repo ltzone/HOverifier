@@ -10,9 +10,8 @@ let add_constraint_pure (acc_pure) (pred: pure_pred)  =
 
 
 let add_constraint (acc: pred_normal_form) (pred: pure_pred) : pred_normal_form =
-  { acc with pure= List.map (fun preds -> And (pred, preds)) (acc.pure) }
+  { acc with pure= List.map (fun (xs, preds) -> xs, And (pred, preds)) (acc.pure) }
 
-let print_endline x = flush_all (); print_endline x; flush_all ()
 
 (* let rec repeat_try f env (candidates:'a)  =
   List.fold_right
@@ -88,17 +87,19 @@ let findi_opt f xs =
   findi_opt_aux 0 xs
 
 
-let check_fun env args fvars spec_to_check pre : spec_res * env =
-  List.iter (fun v -> print_endline (string_of_fun_spec v)) spec_to_check;
-  print_endline ("www" ^ String.concat "," fvars);
+let check_fun env args fvars spec_to_check (pre:pred list) : spec_res * env =
+   List.iter (fun v -> print_endline (__LOC__ ^ string_of_fun_spec v)) spec_to_check;
+  (*print_endline (__LOC__ ^ Env.all_specs env); *)
+   
   let find_spec_name fname =
     findi_opt (String.equal fname) fvars in
   let check_single_fun_spec spec =
     match (find_spec_name spec.fname) with
     | None -> 
-      (
+      (print_endline (string_of_fun_spec spec);
+        (* print_endline (Env.all_specs env); *)
         match Env.find_spec (spec.fname) env with
-        | Some (spec_def::_) -> Sleek.check_spec_sub env pre spec_def spec
+        | Some (spec_def::_) -> print_endline __LOC__; Sleek.check_spec_sub env pre spec_def spec
         | _ -> failwith ("The specification declared as " ^ spec.fname ^ " is neither part of the argument list nor defined function \n"
         ^ string_of_fun_spec spec )
       )
@@ -107,11 +108,11 @@ let check_fun env args fvars spec_to_check pre : spec_res * env =
         let client_spec = Env.find_spec fun_name_in_env env in
         match client_spec with
         (* TODO: try multiple specifications *)
-          | Some (client_spec :: _) -> Sleek.check_spec_sub env pre client_spec spec
+          | Some (client_spec :: _) -> print_endline __LOC__; Sleek.check_spec_sub env pre client_spec spec
           | _ -> failwith ("No specification found for function " ^ fun_name_in_env)
     in
     (* print_endline ("Spec to check:::::" ^ string_of_int (List.length spec_to_check)); *)
-  print_length (spec_to_check);
+  (* print_length (spec_to_check); *)
   let merge_two_inst vs vs' = 
     (* combine two fname assignments, if the assignment conflict, abort this pair *)
     let merged_inst = List.concat_map (fun v -> List.map ((@) v) vs') vs in
@@ -142,32 +143,46 @@ let check_fun env args fvars spec_to_check pre : spec_res * env =
   merged_spec_res, env
 
 
+(* move the existantial vars & function specifications into the envrionment *)
+let normalize_cond env acc =
+  let pre_cond = acc.pure in
+  (* introduce the existantial variables to the environment *)
+  let pre_extv = List.fold_right (@) (List.map fst pre_cond) [] in
+  let pre_cond = List.map snd pre_cond in
+  let env = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env pre_extv in
+  (* add function specifications *)
+  let env = List.fold_left 
+              (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
+              env acc.spec in  
+    env, pre_cond
 
   (* TODO: first check partial/full application, then check pre-post SMT *)
-let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_var * pred_normal_form) list =
+let check_spec_derive env (pre_cond: pure_pred list) args (spec:fun_signature)  : (env * logical_var * pred_normal_form) list =
 (* let spec_to_check = spec.fspec.fpre.spec in *)
 (* let check_env = check_spec env spec_to_check in *)
 (* if check_bool && check_env then  *)
   if List.length args = List.length spec.fvar then
     (* full application *)
     
+    
     ((let subst_pre_to_check = subst_pred_normal_forms (List.map fst spec.fvar) args spec.fpre in
+    (* print_endline (__LOC__ ^ (string_of_fun_spec spec)); *)
+    (* print_endline (__LOC__ ^ "\n" ^ Env.all_specs env); *)
+    (* let pure_to_check = subst_pre_to_check.pure in *)
+    (* print_endline (__LOC__ ^ string_of_pred_normal_form subst_pre_to_check); *)
 
-    let pure_to_check = subst_pre_to_check.pure in
+    let post_extv = List.fold_right (@) (List.map fst (subst_pre_to_check.pure)) [] in
+    let env = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env post_extv in
+    
+    let _, pure_to_check = normalize_cond env subst_pre_to_check in
     let spec_to_check = subst_pre_to_check.spec in
+    (* print_endline (__LOC__ ^ "\n" ^ Env.all_specs env); *)
 
-    List.iter (fun v -> string_of_fun_spec v |> print_endline) spec_to_check;
+    List.iter (fun v -> __LOC__ ^ string_of_fun_spec v |> print_endline) spec_to_check;
 
-  let check_fun_status, env = check_fun env args (List.map fst spec.fvar) spec_to_check pure_to_check  in
-  let check_bool = Sleek.check_pure env (pre_cond) (pure_to_check) in
-    if (check_bool) then
-(*       
-      (* Print inst predicates in the env *)
-      let () = match check_env with
-      | Inst vs -> 
-        print_endline (String.concat "\n" (List.map (fun (n, v) -> n ^ " : " ^ (logical_proposition_to_string v)) vs));
-      | _ -> () in *)
-
+  let check_fun_status, env = check_fun env args (List.map fst spec.fvar) spec_to_check (pure_to_check)  in
+  (* let check_bool = Sleek.check_pure env (pre_cond) (pure_to_check) in *)
+    (* if (check_bool) then *)
 
       match check_fun_status with
       | Fail -> [] 
@@ -180,45 +195,27 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
 
       (let new_anchor = Env.get_fresh_res_name env in
       let new_anchor_ty = snd (fst spec.fpost) in
+      let (fpost_anchor, _), fpost_dnf = spec.fpost in
+      let fpost_ass = fpost_dnf.pure  in
+      let post_subst = subst_ext_pure_pred_list (fpost_anchor) new_anchor fpost_ass in
+      let post_spec_subst = List.map (subst_fun_signature (fpost_anchor) new_anchor) fpost_dnf.spec in
+      (* TODO: we don't need to substitute program variables here? *)
       List.map (fun env ->
+        let post_subst_env = instantiates_pure_preds (SMap.bindings env.fname_assignment) post_subst in
+        let env, post_subst_env = normalize_cond env {pure=post_subst_env; spec=[]} in
+        let subst_res = subst_pure_preds_list (List.map fst spec.fvar) args post_subst_env in
         Env.add_vtype env new_anchor new_anchor_ty, 
         new_anchor, {
           (* add pre_cond to post_cond and produce the accumulated condition *)
-          (* pure= List.concat_map (fun (preds) -> (
-            let fpost_anchor, fpost_dnf = spec.fpost in
-            let fpost_ass = preds_and_pred fpost_dnf.pure preds in
-            let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
-            let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
-            let conj_res = preds_and_pred post_subst_env preds in
-            let subst_res = subst_pure_preds_list spec.fvar args conj_res in
-            subst_res)
-          ) pre_cond; *)
-          pure= 
-            (let fpost_anchor, fpost_dnf = spec.fpost in
-            let fpost_ass = fpost_dnf.pure  in
-            let post_subst = subst_pure_pred_list (fst fpost_anchor) new_anchor fpost_ass in
-            let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
-            let subst_res = subst_pure_preds_list (List.map fst spec.fvar) args post_subst_env in
-            List.concat_map (add_constraint_pure pre_cond) subst_res );
-          spec = []
+          pure= List.map (fun pred -> [], pred)
+            (List.concat_map (add_constraint_pure pre_cond) subst_res );
+          spec =post_spec_subst
         }) envs
-        
-      (* Some (env, new_anchor, {
-        pure= List.concat_map (fun env -> List.concat_map (fun (preds) -> (
-          let fpost_anchor, fpost_dnf = spec.fpost in
-          let fpost_ass = preds_and_pred fpost_dnf.pure preds in
-          let post_subst = subst_pure_pred_list fpost_anchor new_anchor fpost_ass in
-          let post_subst_env = instantiate_pure_preds (SMap.bindings env.fname_assignment) post_subst in
-          let conj_res = preds_and_pred post_subst_env preds in
-          let subst_res = subst_pure_preds_list spec.fvar args conj_res in
-          subst_res)
-        ) pre_cond) envs;
-        spec= []
-        }) *)
         
         )
         
-    else []))
+    (* else [] *)
+    ))
   else 
     (* partial application *)
     let new_name = spec.fname^"'" in
@@ -229,7 +226,7 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
     let applied_args_names = List.map fst applied_args in 
     [env, new_name, {
       (* pure= List.map (fun (prog_vars, preds) -> (prog_vars, normalize_dnf (snd spec.fspec.fpost).pure preds)) pre_cond ; *)
-      pure= pre_cond ;
+      pure= List.map (fun v -> [] , v) pre_cond ;
       spec= [{
         fname=new_name; fvar= rem_args; pnames=spec.pnames;
         fpre=subst_pred_normal_forms applied_args_names args spec.fpre;
@@ -241,19 +238,18 @@ let check_spec_derive env pre_cond args (spec:fun_signature)  : (env * logical_v
 let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.expression) : 
   (env * logical_var * pred_normal_form) list  =
 (* return value: anchor * inferred verification condition *)
-  (* I: move the function specifications into the envrionment *)
-  let open Parsetree in
-  let pre_cond = acc.pure in
-  let env = List.fold_left 
-              (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
-              env acc.spec in  
-  let acc = {pure=pre_cond; spec=[]} in
+let open Parsetree in
+
+
+  (* I: move the existantial vars & function specifications into the envrionment *)
+  let env, pre_cond = normalize_cond env acc in
 
   (* II: forward execution on res *)
   let res :  (env * logical_var * pred_normal_form)  list=
   match expr.pexp_desc with 
   | Pexp_fun (_, _, {ppat_desc=Ppat_var {txt=arg_name;_};_} (*pattern*), expr) -> 
-      infer_of_expression (Env.add_var_name arg_name env) acc expr 
+      infer_of_expression (Env.add_var_name arg_name env) 
+        {pure=List.map (fun v -> [],v) pre_cond;spec=[]} expr 
       (* Note:
          we assume that lambda expressions only occurs at the beginning of a let declaration,
          therefore we can safely ignore and proceed the forward verification.
@@ -302,7 +298,7 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
           *)
           (* The argument list is 0, so we can safely check only the pure part, 
             there should be no spec part describing the funtion arguments *)
-          if Sleek.check_pure env acc.pure fpre.pure then
+          if Sleek.check_pure env pre_cond fpre.pure then
             let fresh_name = Env.get_fresh_res_name env in
             let fresh_ty = snd (fst fpost)in
             let new_env = Env.add_vtype env var_name fresh_ty in
@@ -317,17 +313,14 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       split into several steps *) ->
     (* Step 0: evaluate the function *)
     let function_infer = infer_of_expression env acc f_exp in
+    
     function_infer |>
 
     
+    
     List.concat_map (fun (env, fname, f_acc) -> 
     (* Step 0: normalize the condition again *)
-    let pre_cond = f_acc.pure in
-    let env = List.fold_left 
-                (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
-                env f_acc.spec in  
-    let f_acc = {pure=pre_cond; spec=[]} in
-    print_endline (String.concat "," (Env.available_names env));
+    let env, pre_cond = normalize_cond env f_acc in
 
     let arg_expr_list = List.map snd arg_list in
     
@@ -341,38 +334,25 @@ let rec infer_of_expression (env:env) (acc:pred_normal_form) (expr:Parsetree.exp
       List.map (fun (new_env, new_anchor, new_cond) -> (new_env, new_anchor::arg_anchors, new_cond)))) in
 
 
-    let arg_vars = List.fold_right eval_args arg_expr_list [(env, [], f_acc)] in
+    let arg_vars = List.fold_right eval_args arg_expr_list [(env, [], {pure=List.map (fun v -> [],v) pre_cond;spec=[]})] in
     arg_vars |> List.concat_map 
       (fun (env, arg_vars, acc) ->
+
+      let env, pre_cond = normalize_cond env acc in
 
       let fname = fname in
       let fspecs = Env.find_spec fname env in
     
     (* find a function specification in the context that can be used for each disjunction branch *)
       (* TODO: is this combine sound????
-      Note: especially formultiple specs?
+      Note: especially for multiple specs?
       *)
     (match fspecs with 
     | None -> failwith ("Function spec not found for [" ^ fname ^ "]")
     | Some fspecs ->
     let valid_fspecs = List.concat_map 
-      (check_spec_derive env acc.pure arg_vars) fspecs in
+      (check_spec_derive env pre_cond arg_vars) fspecs in
     if (List.length valid_fspecs = 0) then failwith "No valid function spec available" else
-    (* let unified_anchor = Env.get_fresh_res_name env in
-    let combine_fspecs  {pure=old_pure; spec=old_spec} (env, anchor, {pure; spec}) = 
-    (* print_endline "----------------";
-    flush stdout;
-    Env.print_all_insts env;
-    flush stdout;
-    print_endline "----------------"; *)
-      { pure= (List.map (fun (pure) -> (subst_pure_pred anchor unified_anchor pure)) pure) @ old_pure;
-        spec= (List.map ( fun v ->
-          (*  print_endline (string_of_fun_spec v);
-          print_endline anchor; print_endline unified_anchor;
-          print_endline (string_of_fun_spec (subst_fun_signature_name anchor unified_anchor v)); *)
-          subst_fun_signature_name anchor unified_anchor v) spec)@old_spec (* TODO: subst specification *)
-      } in
-      (env, unified_anchor, List.fold_left combine_fspecs {pure=[];spec=[]} valid_fspecs) *)
       valid_fspecs
       )))
   
@@ -449,8 +429,10 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
     let post_pure = ( substed_post.pure ) in
     let post_spec = ( substed_post.spec ) in
 
+    let pure_env, inferred_post_pure = normalize_cond inferred_env inferred_post in
 
-    let pure_check = Sleek.check_pure inferred_env ( inferred_post.pure ) post_pure in
+
+    let pure_check = Sleek.check_pure pure_env ( inferred_post_pure ) post_pure in
 
     let check_post_spec (expect_spec:fun_signature) : bool = 
       (let exist_spec = Env.find_spec expect_spec.fname inferred_env in
@@ -458,7 +440,7 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
       |  None -> failwith ("No spec exist for expected return spec named " ^ expect_spec.fname)
       | Some exist_spec ->
           (let valid_exist_spec = List.filter 
-              (fun spec -> match Sleek.check_spec_sub env inferred_post.pure expect_spec spec with
+              (fun spec -> match Sleek.check_spec_sub inferred_env inferred_post_pure expect_spec spec with
                | Success -> true | _ -> false
               ) exist_spec in
             List.length valid_exist_spec != 0))) in

@@ -27,6 +27,7 @@ open Hiphop.Spectree;;
 %token TINT TBOOL
 %token NEG
 %token GIVEN
+%token EX
 
 %start <Hiphop.Spectree.fun_signature list * 
         Hiphop.Spectree.logical_proposition list * 
@@ -85,27 +86,37 @@ let arg_pair :=
 | x = ID ; COLON ; y = type_name ; {x, y}
 | x = ID ; {x, Int}
 
+let brace_arg_pair :=
+| LEFT_BRACE ; x = arg_pair; RIGHT_BRACE ; { x }
+
 let type_name :=
 | TINT ; { (Int) }
 | TBOOL ; { Bool }
 
 let logical_item :=
-| PRED ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ; HASSPEC; preds=separated_list(OR, pure_clause) ;
+| PRED ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ; HASSPEC; preds=separated_list(OR, ex_pure_clause) ;
   { {
     pname = f;
     pargs = xs;
     pbody = preds;
   } }
 
+
 let ass := 
-| ps = separated_list(OR, pure_clause) ; { {
+| ps = separated_list(OR, ex_pure_clause) ; { {
     pure =  ps ;
     spec = []
 } }
-| ps = separated_list(OR, pure_clause) ; WITH ; ss = separated_list(AND, spec_clause) ; { {
+| ps = separated_list(OR, ex_pure_clause) ; WITH ; ss = separated_list(AND, spec_clause) ; { {
     pure = ps ;
     spec = ss
 } }
+
+let ex_pure_clause :=
+| x = pure_clause; { [], x }
+| EX; xs=list(brace_arg_pair) ; COMMA ;p = pure_clause; { xs, p }
+
+
 
 
 let pure_clause :=

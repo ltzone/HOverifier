@@ -3,10 +3,10 @@ let compose f g x = f (g x)
 declare compose(f,g,x)
 given fpure(int,int),gpure(int,int)
 requires { true with
-    f(a) |= {true} *->:r1 { fpure(a,r1) } &
-    g(b) |= {true} *->:r2 { gpure(b,r2) }
+    f(a) |= {true} *->:r1 {  fpure(a,r1) } &
+    g(b) |= {true} *->:r2 {  gpure(b,r2) }
  }
-ensures[r] { gpure(x,z) & fpure(z,r) }
+ensures[r] { EX (z:int), gpure(x,z) & fpure(z,r) }
 @*)
 
 let incr x = x + 1

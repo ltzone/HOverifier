@@ -56,7 +56,7 @@ declare twice (f, x)
   given fpure2(int, int)
  requires { true with
    f(a) |= { true } *->:res0 { fpure2(a,res0) } }
- ensures[res] { fpure2(x,t) & fpure2(t,res) }
+ ensures[res] {EX (t:int), fpure2(x,t) & fpure2(t,res) }
 @*)
 
 

@@ -17,12 +17,15 @@ let foo f=
 (*@
 declare foo(f)
 // implicit global n
-requires { true with
+// given
+requires { EX (n:int), true with
     f(b) |= { true } *->:r { n = r } }
 ensures[res] { res = 1 }
 @*)
 
-(*@ pred foo_inst(p:int) |= p = 5  @*)
+(*@ 
+pred foo_inst(p:int) |= p = 5  
+@*)
 
 let g b = 5
 (*@

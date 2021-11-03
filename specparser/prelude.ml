@@ -6,10 +6,10 @@ let div_op_sig = {
   pnames=[];
   fvar=["arg1", Int ;"arg2", Int ];
   fpre= {
-    pure=[(Neg (Arith (Eq, Pvar "arg2", Const (Int 0))))];
+    pure=[[], (Neg (Arith (Eq, Pvar "arg2", Const (Int 0))))];
     spec=[]
   };
-  fpost=("res", Int) , {pure=[(Arith (Eq, Pvar "arg1", (Op (Mult, Pvar "res", Pvar "arg2" ))))]; spec=[]};
+  fpost=("res", Int) , {pure=[[], (Arith (Eq, Pvar "arg1", (Op (Mult, Pvar "res", Pvar "arg2" ))))]; spec=[]};
 }
 
 
@@ -18,10 +18,10 @@ let plus_sig = {
   fvar=["arg1", Int ;"arg2", Int ];
   pnames=[];
   fpre= {
-    pure=[(True)];
+    pure=[[], (True)];
     spec=[]
   };
-  fpost=("plus_res",Int), {pure=[(Arith (Eq, Pvar "plus_res", (Op  
+  fpost=("plus_res",Int), {pure=[[], (Arith (Eq, Pvar "plus_res", (Op  
       (Plus, Pvar "arg1", Pvar "arg2" )
     )))]; spec=[]};
 }
@@ -42,8 +42,8 @@ let eq_sig = {
   fname="=";
   fvar=["p1", Int ; "p2", Int ];
   pnames=[];
-  fpre={pure=[(True)]; spec=[]};
-  fpost=("r", Bool), {pure=[
+  fpre={pure=[[], (True)]; spec=[]};
+  fpost=("r", Bool), {pure=[ [],
     Arith (Eq, Pvar "r", Op (Eqb, Pvar "p1", Pvar "p2"));
   ]; spec=[]};
 }
@@ -53,8 +53,8 @@ let minus_sig = {
   fname="-";
   fvar=["w1", Int ; "w2", Int ];
   pnames=[];
-  fpre={pure=[(True)]; spec=[]};
-  fpost=("res0", Int), {pure=[
+  fpre={pure=[[], (True)]; spec=[]};
+  fpost=("res0", Int), {pure=[[],
     Arith (Eq, Pvar "res0", Op (Minus, Pvar "w1", Pvar "w2"))
   ]; spec=[]};
 }
@@ -63,8 +63,8 @@ let mult_sig = {
   fname="*";
   fvar=["y1", Int ; "y2", Int ];
   pnames=[];
-  fpre={pure=[(True)]; spec=[]};
-  fpost=("res1", Int), {pure=[
+  fpre={pure=[[],(True)]; spec=[]};
+  fpost=("res1", Int), {pure=[[],
     Arith (Eq, Pvar "res1", Op (Mult, Pvar "y1", Pvar "y2"))
   ]; spec=[]};
 }

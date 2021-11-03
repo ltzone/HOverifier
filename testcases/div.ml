@@ -29,7 +29,7 @@ declare twice(f,x)
 given Q(int, int)
 requires    { true with
                 f(x) |= {true} *->:r {Q(x,r)} }
-ensures  [r]{ Q(x,m) & Q(m,r) }
+ensures  [r]{EX (m:int), Q(x,m) & Q(m,r) }
 @*)
 
 

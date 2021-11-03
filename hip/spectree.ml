@@ -39,9 +39,9 @@ type pred = pure_pred
 
 
 type pred_normal_form = {
-  pure: pred list; 
+  pure: ((program_var * exp_type) list * pred) list; 
   (* disjunctive normal form of pure formulas *)
-  spec: fun_signature list;
+  spec: ( fun_signature) list;
 } 
 and fun_signature = {
   fname: program_var;
@@ -56,7 +56,7 @@ and fun_signature = {
 type logical_proposition = {
   pname: fun_id;
   pargs: (logical_var * exp_type) list;
-  pbody: pred list; (* disjunctive normal form *)
+  pbody: ((program_var * exp_type) list * pred) list; (* disjunctive normal form *)
 }
 
 type spec_res = 
@@ -115,16 +115,26 @@ match p with
 | True -> " true "
 | False -> " false "
 
-let pure_preds_to_string ps =
-  String.concat " | " (List.map pure_pred_to_string ps)
-
 let string_of_ty = function
 | Int -> "int"
 | Bool -> "bool"
+let ext_pure_pred_to_string (arglist, p) =
+  let prefix = if List.length arglist = 0 then "" else "EX " in
+  let suffix = if List.length arglist = 0 then "" else ", " in
+  prefix ^ 
+  String.concat "," (List.map (fun (v, vty) -> v ^ ":" ^ string_of_ty vty) arglist) ^ 
+  suffix ^ pure_pred_to_string p
+
+let ext_pure_preds_to_string ps =
+  String.concat " | " (List.map ext_pure_pred_to_string ps)
+
+let pure_preds_to_string ps =
+  String.concat " | " (List.map pure_pred_to_string ps)
+  
 
 
 let rec string_of_pred_normal_form {pure; spec} = 
-  (String.concat " \\/ " (List.map (pure_pred_to_string)
+  (String.concat " \\/ " (List.map (ext_pure_pred_to_string)
     pure) ) ^ 
     if List.length spec = 0 then "" else
     (" with \n\t" ^
@@ -141,7 +151,7 @@ and string_of_fun_spec {fname; fvar; pnames; fpre; fpost} =
 let logical_proposition_to_string  {pname;  pargs;  pbody;} = 
   String.concat ""
   [pname; "("; String.concat "," (List.map (fun (v,t) -> v ^ ":" ^ string_of_ty t) pargs);
-      ") = {"; pure_preds_to_string pbody ;"}" ]
+      ") = {"; ext_pure_preds_to_string pbody ;"}" ]
 
 
 (*******************************
@@ -172,6 +182,9 @@ let rec subst_pure_pred a b = function
 let subst_pure_pred_list a b preds =
   List.map (subst_pure_pred a b) preds 
 
+let subst_ext_pure_pred_list a b preds =
+  List.map (fun (args, pred) -> args, subst_pure_pred a b pred) preds
+  
 
 let rec fill_logical_exp a (b:logical_exp) = function
 | Pvar v -> if String.equal v a then b else Pvar v
@@ -202,7 +215,7 @@ match ax, bx with
 | _ -> failwith "Unmatched argument list in filling"
 
 let fill_pure_preds_list ax bx preds =
-  List.map (fill_pure_preds ax bx) preds 
+  List.map (fun (arg, pred) -> arg, fill_pure_preds ax bx pred) preds 
 
 (* replace ax in p by bx *)
 let rec subst_pure_preds ax bx p =
@@ -217,7 +230,7 @@ let subst_pure_preds_list a b preds =
   List.map (subst_pure_preds a b) preds 
 
 let rec subst_pred_normal_form a b pnf = {
-  pure= List.map (fun pred -> subst_pure_pred a b pred) pnf.pure;
+  pure= List.map (fun (xs,pred) -> xs,subst_pure_pred a b pred) pnf.pure;
   (* disjunctive normal form of pure formulas, every clause comes
      with a list of existential binders of logical variables *)
   spec= List.map (subst_fun_signature a b) pnf.spec
@@ -448,6 +461,7 @@ let add_fn fname specs env =
   { env with specs = SMap.add fname specs env.specs; }
 
 let add_spec_to_fn fname spec env = 
+  print_endline ("-----adding spec: " ^ fname ^ " " ^ string_of_fun_spec spec);
   { env with specs = SMap.update fname (function None -> Some [spec]
                               | Some specs -> Some (spec::specs)) env.specs }                          
 
@@ -457,7 +471,6 @@ let add_specs_to_fn fname specs env =
 let find_spec fname env = SMap.find_opt fname env.specs
 
 let get_fresh_res_name env = 
-  flush_all (); print_endline "new fresh name generated"; flush_all ();
   env.res_index := !(env.res_index) + 1; "_r" ^ string_of_int !(env.res_index)
 
 let get_top_res_name env = "_r" ^ string_of_int !(env.res_index)
@@ -469,30 +482,46 @@ let add_var_name name env = { env with prog_vars = name :: env.prog_vars }
 let vtypes_to_string env =
   String.concat "," (List.map (fun (v, vty) -> v ^ ":" ^ string_of_ty vty) (SMap.bindings env.vtype_context))
 
+let all_specs env =
+  String.concat "\n\n" (List.map 
+    (fun (fname, specs) ->
+      fname ^ "\n" ^
+      String.concat "\n"
+      (List.map string_of_fun_spec specs)
+      )
+    (SMap.bindings env.specs))
+
 end
 
-let rec instantiate_pred fname assign pure_pred : pure_pred list =
+let rec instantiate_pred fname assign pure_pred : ((program_var * exp_type) list * pred) list =
+  let args, pure_pred = pure_pred in
   match pure_pred with
-  | Arith (op, x1, x2) -> [ Arith (op, x1, x2) ]
+  | Arith (op, x1, x2) -> [ args, Arith (op, x1, x2) ]
   | And (p1, p2) -> 
-      let p1_inst = instantiate_pred fname assign p1 in
-      let p2_inst = instantiate_pred fname assign p2 in
-      List.concat_map (fun v -> List.map (fun x -> And (v, x)) p1_inst) p2_inst 
+      let p1_inst = instantiate_pred fname assign ([], p1) in
+      let p2_inst = instantiate_pred fname assign ([], p2) in
+      List.concat_map (fun (arg1, b1) -> List.map (fun (arg2, b2) -> (args @ arg1 @ arg2, And (b1, b2))) p1_inst) p2_inst 
   | Prop (fn, es) ->
       if String.equal fname fn
         then fill_pure_preds_list (List.map fst (assign.pargs)) es (assign.pbody)
-      else  [ Prop (fn, es) ]
-  | Neg p -> instantiate_pred fname assign p
-  | True  -> [ True ]
-  | False -> [ False ]
+      else  [ args, Prop (fn, es) ]
+  | Neg p -> 
+    let p_inst = instantiate_pred fname assign ([], p) in
+      List.map (fun (arg, b) -> (args @ arg, Neg (b))) p_inst
+  | True  -> [ args, True ]
+  | False -> [ args, False ]
 
 
-let instantiate_preds fname assign pure_preds : pure_pred list =
-  List.concat_map (instantiate_pred fname assign) pure_preds
-
-let instantiate_pure_preds fname_assignment pure_preds =
+let instantiates_pure_preds fname_assignment pure_preds =
   (* if List.length (fname_assignment) > 0 then
     print_endline (logical_proposition_to_string (snd (List.nth ( fname_assignment) 0)))
   else (); *)
-  
-  List.fold_right (fun (fname, (ass:logical_proposition)) pred -> instantiate_preds fname ass pred) fname_assignment pure_preds
+  List.fold_right (fun (fname, (ass:logical_proposition)) preds -> 
+    List.concat_map (fun pred -> 
+      instantiate_pred fname ass pred) preds) fname_assignment pure_preds
+
+
+
+
+  (** TODO: the implementation here requires that the existantial variables in every 
+    pure predicate should not overlap in name *)

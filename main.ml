@@ -31,6 +31,7 @@ let test () =
   let input_spec = input_module ^ ".ml" in
   let env = make_sig_from_file input_spec in
   let ic = open_in input_program in
+  print_endline ("[TEST] " ^ module_name);
   let output = ref "\nResult:" in
   try
     let lines =  (input_lines ic ) in

@@ -52,6 +52,20 @@ let exists_formula_of env ctx xs formula =
   Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
+let forall_formula_of_ty ctx xs formula =
+  let xs = List.map (fun (v, vty) -> 
+    Expr.mk_const_s ctx v (sort_of_ty ctx vty)) xs in
+  if List.length xs = 0 then formula else
+  Quantifier.expr_of_quantifier (Quantifier.mk_forall_const ctx xs formula 
+                        (Some 1) [] [] None None) 
+                        
+let exists_formula_of_ty ctx xs formula =
+  let xs = List.map (fun (v, vty) -> 
+    Expr.mk_const_s ctx v (sort_of_ty ctx vty)) xs in
+  if List.length xs = 0 then formula else
+  Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
+                        (Some 1) [] [] None None) 
+
 let rec expr_to_expr env ctx : logical_exp -> Expr.expr = function
   | Pvar v  -> 
       let vty = Env.lookup_vtype env v in
@@ -115,6 +129,12 @@ let pure_preds_to_expr env ctx preds : Expr.expr =
     Boolean.mk_or ctx [pred_expr; expr] in
   List.fold_right fold_or preds (Boolean.mk_false ctx) 
 
+let ext_pure_preds_to_expr env ctx preds : Expr.expr =
+  let fold_or (args, pred) expr =
+    let pred_expr = pure_pred_to_expr env ctx pred in
+    let pred_quanti = exists_formula_of_ty ctx args pred_expr in
+    Boolean.mk_or ctx [pred_quanti; expr] in
+  List.fold_right fold_or preds (Boolean.mk_false ctx) 
 
 let solver_wrapper ctx goal : bool =
   (* discharge a goal by solving its negation
@@ -151,11 +171,11 @@ let logical_proposition_to_expr env ctx fname {pargs; pbody; _} : Expr.expr =
   let arg_list = List.map fst pargs in
   let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
   let var_list = List.map (encode_arg ctx) pargs in
-  let ex_vars = list_diff (VarSet.elements (fvars_of_pures pbody)) arg_list in
+  let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
   forall_formula_of env ctx arg_list 
     (Boolean.mk_eq ctx 
-      (exists_formula_of env ctx ex_vars (pure_preds_to_expr env ctx pbody))
+      (exists_formula_of env ctx ex_vars (pure_preds_to_expr env ctx (List.map snd pbody)))
       (FuncDecl.apply fun_decl var_list) 
       )
 
@@ -164,11 +184,11 @@ let logical_proposition_to_expr_imply env ctx fname {pargs; pbody; _} : Expr.exp
   let arg_list = List.map fst pargs in
   let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
   let var_list = List.map (encode_arg ctx) pargs in
-  let ex_vars = list_diff (VarSet.elements (fvars_of_pures pbody)) arg_list in
+  let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
   forall_formula_of env ctx arg_list 
     (Boolean.mk_implies ctx 
-      (exists_formula_of env ctx ex_vars (pure_preds_to_expr env ctx pbody))
+      (exists_formula_of env ctx ex_vars (pure_preds_to_expr env ctx (List.map snd pbody)))
       (FuncDecl.apply fun_decl var_list) 
       )
 
@@ -198,15 +218,19 @@ z3 Cannot synthesize a fpure itself!
 
 
 let solver_check_bool env ctx goal (cand: prop_candidates) =
+  print_length(cand);
   let solver = (Solver.mk_simple_solver ctx) in
     let f e = 
       (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
     Solver.add solver [ Boolean.mk_not ctx e ] in
       ignore (List.map f (Goal.get_formulas goal)) ;
-    List.iter (fun (fname, fbody) -> 
-      print_endline (Expr.to_string (logical_proposition_to_expr env ctx fname fbody));
+    List.iter (fun (fname, fbody) ->
+      let post_extv = List.fold_right (@) (List.map fst (fbody.pbody)) [] in
+      let post_extv = fbody.pargs @ post_extv in
+      let env' = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env post_extv in
+      print_endline (Expr.to_string (logical_proposition_to_expr env' ctx fname fbody));
       Solver.add solver
-      [logical_proposition_to_expr env ctx fname fbody]) cand;
+      [logical_proposition_to_expr env' ctx fname fbody]) cand;
     let q = (Solver.check solver []) in
       if q == UNSATISFIABLE then true
       else
@@ -252,8 +276,9 @@ let var_quantifier_of_spec (spec: fun_signature) : (logical_var ) list *  (logic
   let pre = spec.fpre.pure in
   let post = (snd spec.fpost).pure in
   let fvars = VarSet.of_list (List.map fst spec.fvar) in
-  let pre_fvs = fvars_of_pures pre in
-  let post_fvs = fvars_of_pures post in
+  (* TODO: sanity check *)
+  let pre_fvs = fvars_of_pures  (List.map snd pre ) in
+  let post_fvs = fvars_of_pures (List.map snd post)  in
   let post_exs = VarSet.diff post_fvs pre_fvs in 
   let forall_vars = VarSet.elements (VarSet.union pre_fvs fvars) in
   let exists_vars = VarSet.elements (VarSet.diff post_exs fvars) in 
@@ -290,7 +315,7 @@ let make_prop_candidates env (fnames: (fun_id * exp_type list) list) :
 
 
 
-let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res = 
+let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res = 
 (* For client signature GIVEN Z1, pre1 *-> exist x.post1
    and server signature GIVEN Z2, pre2 *-> exist y.post2
    fun1 <: fun2 should be encoded into
@@ -304,6 +329,7 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
    quantified Z1
 *)
   print_endline "sleek: checking for subsumption";
+  print_endline (Env.vtypes_to_string env );
   print_endline ("[context] " ^ pure_preds_to_string pre);
   print_endline ("[client] " ^ string_of_fun_spec fun1);
   print_endline ("[server] " ^ string_of_fun_spec fun2);
@@ -312,9 +338,25 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
   let fun2 = rename_fun_args fun1 fun2 in
   (* fun1 is also associated with pre, so we rename fun2 *)
 
-  let spec1_all, spec1_ex = var_quantifier_of_spec fun1 in
+  let post_extv = List.fold_right (@) (List.map fst 
+    (fun1.fpre.pure @ (snd fun1.fpost).pure @ fun2.fpre.pure @ (snd fun2.fpost).pure  )) [] in
+  let post_extv = [fst fun1.fpost] @ fun1.fvar @ post_extv in
+  let env = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env post_extv in
+
+  (*
+  g:{ex x'.P'(x')} r {ex y'. Q'(x',y',r)} <: f(Z):{ ex x. P(x) } r { ex y. Q(x,y,r) } 
+  ==>
+  forall x, P(x) -> ex Z', ex x'. P'(x') /\ (forall r, ex y'. Q'(x',y',r) -> ex y. Q(x,y,r))
+  *)
+  let x' = List.concat_map fst fun1.fpre.pure in
+  let x = List.concat_map fst fun2.fpre.pure in
+  let y' = List.concat_map fst (snd fun1.fpost).pure in
+  let y = List.concat_map fst (snd fun2.fpost).pure in
+
+
+  (* let spec1_all, spec1_ex = var_quantifier_of_spec fun1 in
   let spec2_all, spec2_ex = var_quantifier_of_spec fun2 in
-  let fvar_pre = VarSet.elements (fvars_of_pures pre) in
+  let fvar_pre = VarSet.elements (fvars_of_pures (pre)) in
   let spec1_all = list_diff spec1_all fvar_pre in
   let spec2_all = list_diff spec2_all fvar_pre in
   let arg_all = list_union fvar_pre (List.map fst fun1.fvar) in
@@ -322,33 +364,33 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
   let spec2_all = list_diff spec2_all arg_all in
   let shared_ex = list_intersect spec1_ex spec2_ex in
   let spec1_ex = list_diff spec1_ex shared_ex in
-  let spec2_ex = list_diff spec2_ex shared_ex in
+  let spec2_ex = list_diff spec2_ex shared_ex in *)
 
   let cfg = [("model", "true"); ("proof", "true")] in
   let ctx = (mk_context cfg) in
   let goal = Goal.mk_goal ctx true true true in 
   let pre_formula = (pure_preds_to_expr env ctx pre) in
-  let pre1_formula = (pure_preds_to_expr env ctx fun1.fpre.pure) in
-  let pre2_formula = (pure_preds_to_expr env ctx fun2.fpre.pure) in
-  let post1_formula = (pure_preds_to_expr env ctx (snd fun1.fpost).pure) in
-  let post2_formula = (pure_preds_to_expr env ctx (snd fun2.fpost).pure) in
+  let pre1_formula = (pure_preds_to_expr env ctx (List.map snd fun1.fpre.pure)) in
+  let pre2_formula = (pure_preds_to_expr env ctx (List.map snd fun2.fpre.pure)) in
+  let post1_formula = (pure_preds_to_expr env ctx (List.map snd (snd fun1.fpost).pure)) in
+  let post2_formula = (pure_preds_to_expr env ctx (List.map snd (snd fun2.fpost).pure)) in
   let impl_formula_lhs = Boolean.mk_and ctx [pre_formula; pre2_formula] in
   let impl_formula_rhs = Boolean.mk_and ctx [
       pre1_formula;
-      forall_formula_of env ctx shared_ex
+      (* forall_formula_of env ctx shared_ex *)
         (Boolean.mk_implies ctx
-        (exists_formula_of env ctx spec1_ex post1_formula)
-        (exists_formula_of env ctx spec2_ex post2_formula)
+        (exists_formula_of_ty ctx y' post1_formula)
+        (exists_formula_of_ty ctx y post2_formula)
       )
   ] in
-  let quanti_rhs = exists_formula_of env ctx spec2_all impl_formula_rhs in
+  let quanti_rhs = exists_formula_of_ty ctx x' impl_formula_rhs in
   let impl_formula = Boolean.mk_implies ctx impl_formula_lhs quanti_rhs in
-  let quanti_formula = forall_formula_of env ctx spec1_all impl_formula in
+  let quanti_formula = forall_formula_of_ty ctx x impl_formula in
   (* let quanti_formula = Boolean.mk_and ctx
     [;
     quanti_formula] in *)
   Goal.add goal [quanti_formula];
-  print_endline (Expr.to_string (quanti_formula));
+  print_endline (__LOC__ ^ Expr.to_string (quanti_formula));
   
 (* Step 2: try high level verification *)
   let ho_verif = solver_check_bool env ctx goal [] in
@@ -357,8 +399,11 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
 (* Step 3: try instantiate from user-defined predicates *)
   let fname_to_instantiate = 
     VarSet.elements
-      (VarSet.union (fname_of_pures fun2.fpre.pure)
-      (fname_of_pures (snd fun2.fpost).pure)) in
+      (VarSet.union (fname_of_pures (List.map snd fun2.fpre.pure))
+      (fname_of_pures (List.map snd (snd fun2.fpost).pure))) in
+      print_string ("inst "); print_length(fname_to_instantiate);
+      print_endline (string_of_fun_spec fun2);
+      print_endline (string_of_fun_spec fun1);
   let fname_sig_to_inst = List.map (Env.lookup_ftype env) fname_to_instantiate in
   let candidates = make_prop_candidates env fname_sig_to_inst in
   print_assignment_groups candidates;
@@ -368,17 +413,21 @@ let check_spec_sub (env:env) (pre: pure_pred list) fun1 fun2 : spec_res =
     Inst feasible_candidates
 )
 
-let make_goal env ctx pre post prog_vars =
+let make_goal env ctx (pre:( pred) list) 
+(post:((program_var * exp_type) list * pred) list) prog_vars =
+
+  let post_extv = List.fold_right (@) (List.map fst post) [] in
+  let env = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env post_extv in
 
   let forall_prog_vs = VarSet.of_list prog_vars in
-  let pre_fvs = VarSet.diff (fvars_of_pures pre) forall_prog_vs in
-  let post_fvs = VarSet.diff (fvars_of_pures post) forall_prog_vs in
+  let pre_fvs = VarSet.diff (fvars_of_pures (pre)) forall_prog_vs in
+  let post_fvs = VarSet.diff (fvars_of_pures (List.map snd post)) forall_prog_vs in
   let post_exs = VarSet.diff post_fvs pre_fvs in 
   let forall_vars = VarSet.elements pre_fvs in
   let exists_vars = VarSet.elements post_exs in 
 
   let pre_formula = (pure_preds_to_expr env ctx pre) in
-  let post_formula = (pure_preds_to_expr env ctx post) in
+  let post_formula = (ext_pure_preds_to_expr env ctx post) in
 
 
   (* let is = (Arithmetic.Integer.mk_sort ctx) in *)
@@ -403,11 +452,13 @@ let make_goal env ctx pre post prog_vars =
   (* Goal.add goal [ impl_formula ]; *)
   impl_formula
 
-let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool = 
+let check_pure env (pre: (pred) list) 
+                   (post:((program_var * exp_type) list * pred) list) : bool = 
   print_endline "sleek: checking for pre and post";
   print_endline (Env.vtypes_to_string env);
   print_endline ("[pre] " ^ pure_preds_to_string pre);
-  print_endline ("[post] " ^ pure_preds_to_string post);
+  print_endline ("[post] " ^ ext_pure_preds_to_string post);
+
 
   let cfg = [("model", "true"); ("proof", "true")] in
   let ctx = (mk_context cfg) in
@@ -423,8 +474,8 @@ let check_pure env (pre: pure_pred list) (post:pure_pred list) : bool =
   let fname_to_instantiate = 
     list_diff
       (VarSet.elements
-        (VarSet.union (fname_of_pures pre)
-        (fname_of_pures post)))
+        (VarSet.union (fname_of_pures (pre))
+        (fname_of_pures (List.map snd post))))
       (Env.insted_preds env) in
   let fname_sig_to_inst = List.map (Env.lookup_ftype env) fname_to_instantiate in
   let candidates = make_prop_candidates env fname_sig_to_inst in

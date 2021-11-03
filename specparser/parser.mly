@@ -12,6 +12,9 @@ open Hiphop.Spectree;;
 %token RIGHT_BRACKET
 %token LEFT_SQUARE
 %token RIGHT_SQUARE
+%token LEFT_ANGLE
+%token RIGHT_ANGLE
+%token HAS_FIELD
 %token PLUS MINUS MULT DIV 
 %token AND OR
 %token COMMA
@@ -27,6 +30,7 @@ open Hiphop.Spectree;;
 %token TINT TBOOL
 %token NEG
 %token GIVEN
+%token ARROW
 %token EX
 
 %start <Hiphop.Spectree.fun_signature list * 
@@ -38,6 +42,7 @@ open Hiphop.Spectree;;
 %left AND OR
 %left PLUS MINUS
 %left MULT DIV
+%right ARROW
 %nonassoc LEFT_BRACE
 %nonassoc ID
 %nonassoc TRUE FALSE INT
@@ -92,6 +97,8 @@ let brace_arg_pair :=
 let type_name :=
 | TINT ; { (Int) }
 | TBOOL ; { Bool }
+| a = type_name ; ARROW ; b = type_name; { Arrow (a, b) }
+| a = ID ; { Tvar a }
 
 let logical_item :=
 | PRED ; f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, arg_pair) ; RIGHT_BRACE ; HASSPEC; preds=separated_list(OR, ex_pure_clause) ;
@@ -128,6 +135,8 @@ let pure_clause :=
 | x = arith_clause ; { x }
 | f = ID ; LEFT_BRACE ; xs =separated_list(COMMA, logical_expression) ; RIGHT_BRACE;
   { Prop (f, xs) }
+| pname = ID; HAS_FIELD ; cname = ID; LEFT_ANGLE ; xs = separated_list(COMMA, logical_expression) ; RIGHT_ANGLE;
+  { Field (pname, cname, xs) }
 
 let arith_clause :=
 | x1 = logical_expression ; EQ ; x2 = logical_expression ;

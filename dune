@@ -3,6 +3,10 @@
  (libraries hiphop frontend utils z3 specparser)
  (link_flags -cc g++))
 
+; (executable
+;  (name test)
+;  (libraries  frontend utils z3)
+;  (link_flags -cc g++))
 
  ; (executable
  ; (name playz3)

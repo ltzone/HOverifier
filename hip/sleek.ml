@@ -7,6 +7,23 @@ exception TestFailedException of string
 let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
 
 
+let encode_ty env ctx = function
+| Int -> Some (Arithmetic.Integer.mk_sort ctx)
+| Bool -> Some (Boolean.mk_sort ctx)
+| Arrow _ -> None
+| Tvar a -> 
+    let tsort = Env.lookup_adt_sort env a in
+    Some (tsort ctx)
+
+let encode_arg env ctx = function
+| (v, Int) -> Some (Arithmetic.Integer.mk_const_s ctx v)
+| (v, Bool) -> Some (Boolean.mk_const_s ctx v)
+| (_, Arrow _) -> None
+| (v, Tvar a) ->
+    let tsort = Env.lookup_adt_sort env a in
+    Some (Expr.mk_const_s ctx v (tsort ctx))
+
+
 let print_assignment_groups vs =
   print_endline "[[[[[candidate assignments ]]]]]";
   List.iter (fun vs' ->
@@ -33,36 +50,41 @@ let list_intersect a b =
   let a_set_b = VarSet.inter a_set b_set in
   VarSet.elements a_set_b
 
-let sort_of_ty ctx = function
-| Int -> Arithmetic.Integer.mk_sort ctx
-| Bool -> Boolean.mk_sort ctx
 
 let forall_formula_of env ctx xs formula =
-  let xs = List.map (fun v -> 
+  let xs = List.filter_map (fun v -> 
       let vty = Env.lookup_vtype env v in
-      Expr.mk_const_s ctx v (sort_of_ty ctx vty)) xs in
+      match (encode_ty env ctx vty) with
+      | Some ty ->  Some (Expr.mk_const_s ctx v ty)
+      | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_forall_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
 let exists_formula_of env ctx xs formula =
-  let xs = List.map (fun v -> 
-    let vty = Env.lookup_vtype env v in
-    Expr.mk_const_s ctx v (sort_of_ty ctx vty)) xs in
+  let xs = List.filter_map (fun v -> 
+      let vty = Env.lookup_vtype env v in
+      match (encode_ty env ctx vty) with
+      | Some ty ->  Some (Expr.mk_const_s ctx v ty)
+      | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
-let forall_formula_of_ty ctx xs formula =
-  let xs = List.map (fun (v, vty) -> 
-    Expr.mk_const_s ctx v (sort_of_ty ctx vty)) xs in
+let forall_formula_of_ty env ctx xs formula =
+  let xs = List.filter_map (fun (v, vty) -> 
+    match (encode_ty env ctx vty) with
+      | Some ty ->  Some (Expr.mk_const_s ctx v ty)
+      | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_forall_const ctx xs formula 
                         (Some 1) [] [] None None) 
                         
-let exists_formula_of_ty ctx xs formula =
-  let xs = List.map (fun (v, vty) -> 
-    Expr.mk_const_s ctx v (sort_of_ty ctx vty)) xs in
+let exists_formula_of_ty env ctx xs formula =
+  let xs = List.filter_map (fun (v, vty) -> 
+    match (encode_ty env ctx vty) with
+      | Some ty ->  Some (Expr.mk_const_s ctx v ty)
+      | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
                         (Some 1) [] [] None None) 
@@ -70,10 +92,14 @@ let exists_formula_of_ty ctx xs formula =
 let rec expr_to_expr env ctx : logical_exp -> Expr.expr = function
   | Pvar v  -> 
       let vty = Env.lookup_vtype env v in
-      Expr.mk_const_s ctx v (sort_of_ty ctx vty) 
+      (match (encode_ty env ctx vty) with
+      | Some ty -> Expr.mk_const_s ctx v ty
+      | None -> failwith (v ^ " can't have function type"))
   | Lvar v -> 
       let vty = Env.lookup_vtype env v in
-      Expr.mk_const_s ctx v (sort_of_ty ctx vty)  
+      (match (encode_ty env ctx vty) with
+      | Some ty -> Expr.mk_const_s ctx v ty
+      | None -> failwith (v ^ " can't have function type"))
   (* | Fun (f, vs) -> 
       let arg_list = List.init (List.length vs) (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
       let target_sort = Arithmetic.Integer.mk_sort ctx in
@@ -103,6 +129,13 @@ let rec pure_pred_to_expr env ctx pred : Expr.expr =
         (* fun ctx e1 e2 -> Boolean.mk_and ctx [Arithmetic.mk_le ctx e1 e2 ; Arithmetic.mk_le ctx e2 e1 ] *)
       | Le -> Arithmetic.mk_le in (* TODO: is this correct? *)
       oper_fun ctx t1_exp t2_exp
+  | Field (p, c, xs) ->
+      let xs_exp = List.map (expr_to_expr env ctx) xs in
+      let constr_decl = (Env.lookup_adt_constr env c) ctx in
+      let p_sort = (Env.lookup_adt_sort env p) ctx in
+      let p_expr = Expr.mk_const_s ctx p p_sort in
+      Boolean.mk_eq ctx p_expr (FuncDecl.apply
+        (Datatype.Constructor.get_constructor_decl constr_decl) xs_exp)
   | And (p1, p2) ->
       let p1_exp = pure_pred_to_expr env ctx p1 in
       let p2_exp = pure_pred_to_expr env ctx p2 in
@@ -133,7 +166,7 @@ let pure_preds_to_expr env ctx preds : Expr.expr =
 let ext_pure_preds_to_expr env ctx preds : Expr.expr =
   let fold_or (args, pred) expr =
     let pred_expr = pure_pred_to_expr env ctx pred in
-    let pred_quanti = exists_formula_of_ty ctx args pred_expr in
+    let pred_quanti = exists_formula_of_ty env ctx args pred_expr in
     Boolean.mk_or ctx [pred_quanti; expr] in
   List.fold_right fold_or preds (Boolean.mk_false ctx) 
 
@@ -160,18 +193,11 @@ let solver_wrapper ctx goal : bool =
       let n = (Model.get_const_decls m) in    
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n ; false
 
-let encode_ty ctx = function
- Int -> Arithmetic.Integer.mk_sort ctx
-| Bool -> Boolean.mk_sort ctx
-
-let encode_arg ctx = function
-| (v, Int) -> Arithmetic.Integer.mk_const_s ctx v
-| (v, Bool) -> Boolean.mk_const_s ctx v
 
 let logical_proposition_to_expr env ctx fname {pargs; pbody; _} : Expr.expr =
   let arg_list = List.map fst pargs in
-  let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
-  let var_list = List.map (encode_arg ctx) pargs in
+  let arg_ty_list = List.filter_map ((encode_ty env ctx)) (List.map (snd) pargs) in
+  let var_list = List.filter_map (encode_arg env ctx) pargs in
   let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
   forall_formula_of env ctx arg_list 
@@ -185,11 +211,11 @@ let logical_proposition_to_expr_imply env ctx fname {pargs; pbody; _} : Expr.exp
   (* let arg_list = List.map fst pargs in *)
   let ty_info = pargs @ (List.concat_map fst pbody) in
   let env = List.fold_left (fun env (argv, argt) -> Env.add_vtype env argv argt) env ty_info in
-  let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
-  let var_list = List.map (encode_arg ctx) pargs in
+  let arg_ty_list = List.filter_map ((encode_ty env ctx)) (List.map (snd) pargs) in
+  let var_list = List.filter_map (encode_arg env ctx) pargs in
   (* let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in *)
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
-  forall_formula_of_ty ctx pargs 
+  forall_formula_of_ty env ctx pargs 
     (Boolean.mk_implies ctx 
       ((ext_pure_preds_to_expr env ctx (pbody)))
       (FuncDecl.apply fun_decl var_list) 
@@ -382,13 +408,13 @@ let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res =
       pre1_formula;
       (* forall_formula_of env ctx shared_ex *)
         (Boolean.mk_implies ctx
-        (exists_formula_of_ty ctx y' post1_formula)
-        (exists_formula_of_ty ctx y post2_formula)
+        (exists_formula_of_ty env ctx y' post1_formula)
+        (exists_formula_of_ty env ctx y post2_formula)
       )
   ] in
-  let quanti_rhs = exists_formula_of_ty ctx x' impl_formula_rhs in
+  let quanti_rhs = exists_formula_of_ty env ctx x' impl_formula_rhs in
   let impl_formula = Boolean.mk_implies ctx impl_formula_lhs quanti_rhs in
-  let quanti_formula = forall_formula_of_ty ctx x impl_formula in
+  let quanti_formula = forall_formula_of_ty env ctx x impl_formula in
   (* let quanti_formula = Boolean.mk_and ctx
     [;
     quanti_formula] in *)

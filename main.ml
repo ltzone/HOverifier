@@ -23,6 +23,7 @@ let make_sig_from_file filename =
 
 let test () = 
   let open Hiphop.Hip in
+  let open Frontend.Parsetree in
   let module_name = 
     if Array.length (Sys.argv) <= 1 then
       "double"
@@ -41,6 +42,19 @@ let test () =
     
 
     let progs = Parser.implementation Lexer.token (Lexing.from_string line) in
+
+    let prog_tys = List.concat (List.filter_map (fun prog ->
+      match prog.pstr_desc with
+      | Pstr_type (_, dls) -> Some dls
+      | _ -> None
+      ) progs) in
+    let env = List.fold_left (Hiphop.Spectree.Env.add_adt_decl) env prog_tys in
+
+    let progs = List.filter_map (fun prog ->
+      match prog.pstr_desc with
+      | Pstr_value _ -> Some prog
+      | _ -> None
+      ) progs in
     
     List.iter (fun prog -> (  
 

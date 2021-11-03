@@ -1,4 +1,5 @@
 - GIVEN/ NOT GIVEN predicates
+  - If not given, then fix the assignment!
 - add types to predicates, Q(bool, int->int)...
 - sanity check for type matching in variable substitution
 

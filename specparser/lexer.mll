@@ -42,6 +42,9 @@ and read =
   | '}'    { RIGHT_BRACKET }
   | '['    { LEFT_SQUARE }
   | ']'    { RIGHT_SQUARE }
+  | '<'    { LEFT_ANGLE }
+  | '>'    { RIGHT_ANGLE }
+  | "::"   { HAS_FIELD }
   | ','    { COMMA }
   | int    { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | "true" { TRUE }
@@ -70,6 +73,7 @@ and read =
   | ":"         { COLON }
   | "given"     { GIVEN }
   | "EX"     { EX }
+  | "->"     { ARROW }
   | id     { ID (Lexing.lexeme lexbuf) }
   | _      { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof    { EOF }

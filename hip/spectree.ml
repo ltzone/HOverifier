@@ -1,7 +1,7 @@
 (* logical expressions *)
 
 
-
+let string_of_ident = Frontend.Longident.last
 
 type logical_var = string
 
@@ -20,10 +20,14 @@ type logical_exp = Pvar of program_var
 | Op of bin_operator * logical_exp * logical_exp
 
 
+type fun_id = string
+
+type constr_id = string
+
 type exp_type = Int 
 | Bool
-
-type fun_id = string
+| Arrow of (exp_type * exp_type)
+| Tvar of constr_id
 
 type logical_fun = fun_id * (logical_var * exp_type) list
 
@@ -34,6 +38,7 @@ type pure_pred = Arith of arith_pred_oper * logical_exp * logical_exp
               | Prop of fun_id * (logical_exp list)
               | Neg of pure_pred
               | True | False
+              | Field of logical_var * constr_id * (logical_exp list)
 
 type pred = pure_pred
 
@@ -66,6 +71,7 @@ type spec_res =
 
 let rec thin_pred = function
 | Arith (oper, t1, t2) -> Arith (oper, t1, t2)
+| Field (p, c, xs) -> Field (p, c, xs)
 | And (p1, True) -> thin_pred p1
 | And (True, p2) -> thin_pred p2
 | And (_, False) -> False
@@ -114,10 +120,15 @@ match p with
     String.concat "" ([p; "(" ; String.concat "," (List.map logical_exp_to_string xs) ; ")" ])
 | True -> " true "
 | False -> " false "
+| Field (p, c, xs) -> p ^ "::" ^ c ^ "<" ^ String.concat "," (List.map logical_exp_to_string xs) ^ ">"
 
-let string_of_ty = function
+let rec string_of_ty = function
 | Int -> "int"
 | Bool -> "bool"
+| Arrow (x1, x2) -> string_of_ty x1 ^ " -> " ^ string_of_ty x2
+| Tvar a -> a 
+
+
 let ext_pure_pred_to_string (arglist, p) =
   let prefix = if List.length arglist = 0 then "" else "EX " in
   let suffix = if List.length arglist = 0 then "" else ", " in
@@ -172,6 +183,7 @@ let rec subst_logical_exp a b =
 
 let rec subst_pure_pred a b = function
 | Arith (oper, t1, t2) -> Arith (oper, (subst_logical_exp a b t1), (subst_logical_exp a b t2))
+| Field (p, c, xs) -> Field (p, c, List.map (subst_logical_exp a b) xs)
 | And (p1, p2) -> And ((subst_pure_pred a b p1), (subst_pure_pred a b p2))
 (* | Or (p1, p2) -> Or ((subst_pure_pred a b p1), (subst_pure_pred a b p2)) *)
 | Neg p1 -> Neg (subst_pure_pred a b p1)
@@ -196,6 +208,7 @@ let rec fill_logical_exp a (b:logical_exp) = function
 
 let rec fill_pure_pred a b = function
 | Arith (oper, t1, t2) -> Arith (oper, (fill_logical_exp a b t1), (fill_logical_exp a b t2))
+| Field (p, c, xs) -> Field (p, c, List.map (fill_logical_exp a b) xs)
 | And (p1, p2) -> And ((fill_pure_pred a b p1), (fill_pure_pred a b p2))
 (* | Or (p1, p2) -> Or ((fill_logical_exp a b p1), (fill_logical_exp a b p2)) *)
 | Neg p1 -> Neg (fill_pure_pred a b p1)
@@ -311,6 +324,8 @@ let rec fvars_of_pure p fvars : VarSet.t =
       List.fold_right (fvars_of_expr) [t1; t2] fvars
   | And (p1, p2) ->
       List.fold_right (fvars_of_pure) [p1; p2] fvars
+  | Field (_, _, xs) ->
+      List.fold_right (fvars_of_expr) xs fvars
   (* | Or (p1, p2) ->
       List.fold_right (fvars_of_pure) [p1; p2] fvars *)
   | Neg p -> fvars_of_pure p fvars
@@ -339,6 +354,8 @@ let rec fname_of_pure p fvars : VarSet.t =
       List.fold_right (fname_of_pure) [p1; p2] fvars
   (* | Or (p1, p2) ->
       List.fold_right (fname_of_pure) [p1; p2] fvars *)
+  | Field (_, _, xs) -> 
+      List.fold_right (fname_of_expr) xs fvars
   | Neg p -> fname_of_pure p fvars
   | Prop (p, vs) ->
       let fvars' = List.fold_right (fname_of_expr) vs fvars in
@@ -373,6 +390,7 @@ end)
 module SSet = Set.Make(String)
 
 type env = {
+
 (* module name -> a bunch of function specs *)
 specs : fun_signature list SMap.t;
 
@@ -405,7 +423,12 @@ ftype_context: (exp_type list) SMap.t;
    
    *)
 (* fnames : SSet.t; *)
-vtype_context: exp_type SMap.t
+vtype_context: exp_type SMap.t;
+(* the dynamic context to record the types of variables  *)
+
+adt_constr_decls: (Z3.context -> Z3.Datatype.Constructor.constructor) SMap.t;
+
+adt_decls: (Z3.context -> Z3.Sort.sort) SMap.t;
 }
 
 
@@ -418,7 +441,68 @@ let empty = {
   ftype_context = SMap.empty;
   vtype_context = SMap.empty;
   prog_vars = [];
+  adt_constr_decls = SMap.empty;
+  adt_decls = SMap.empty;
 }
+
+let lookup_adt_constr env constr_str = match SMap.find_opt constr_str env.adt_constr_decls with
+| Some v -> v
+| None -> failwith @@ "No constructor definition found for " ^ constr_str
+
+let lookup_adt_sort env ty_str = match SMap.find_opt ty_str env.adt_decls with
+| Some v -> v
+| None -> failwith @@ "No type found for " ^ ty_str
+
+let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
+  let open Frontend.Parsetree in
+  let open Z3 in
+  let ty_name = decl.ptype_name.txt in
+  match decl.ptype_kind with
+  | Ptype_variant constr_list -> 
+    let decls =
+      List.map (fun constr ->
+        let constr_name = constr.pcd_name.txt in
+        match constr.pcd_res, constr.pcd_args with
+        | None, Pcstr_tuple arg_tys ->
+          print_endline (string_of_int (List.length arg_tys));
+            let rec collect_args arg_ty = 
+              match arg_ty.ptyp_desc with
+              | Ptyp_constr (tyn, []) -> [ string_of_ident tyn.txt ]
+              | Ptyp_tuple tys -> List.concat_map collect_args tys
+              | _ -> print_endline (constr_name)
+              ;failwith "Other type variables not supported[1]" in
+            let args =  List.concat_map collect_args arg_tys in
+            let decl_exprs = (fun ctx ->
+              let field_symbols = List.init (List.length args) 
+                  (fun i -> Symbol.mk_string ctx (constr_name ^ "_" ^ string_of_int i)) in
+              let decide_ty ty_str =
+                (if String.equal ty_str "int" then (Some (Arithmetic.Integer.mk_sort ctx), 1)
+                else if String.equal ty_str "bool" then (Some (Boolean.mk_sort ctx), 1)
+                else if String.equal ty_str constr_name then (None, 0)
+                else (let decl_sort = lookup_adt_sort env ty_str in
+                  (Some (decl_sort ctx), 1))) in
+              let field_sorts = List.map decide_ty args in
+              Datatype.mk_constructor_s ctx constr_name
+                (Symbol.mk_string ctx constr_name) 
+                field_symbols
+                (List.map fst field_sorts)
+                (List.map snd field_sorts)
+            ) in
+            (constr_name, decl_exprs)
+        | _ -> failwith "Other type declarations not supported[2]"
+      ) constr_list in
+    let adt_sort = (fun ctx ->
+      Datatype.mk_sort_s ctx ty_name (List.map (fun v -> v ctx) (List.map snd decls))
+    ) in
+    {
+      env with
+      adt_constr_decls= List.fold_left (fun old_map (k , v) -> SMap.add k v old_map) env.adt_constr_decls decls;
+      adt_decls= SMap.add ty_name adt_sort env.adt_decls
+    }
+  | _ -> failwith "Other type declarations not supported"
+
+
+
 
 let insted_preds env = List.map fst (SMap.bindings env.fname_assignment)
 
@@ -497,6 +581,7 @@ let rec instantiate_pred fname assign pure_pred : ((program_var * exp_type) list
   let args, pure_pred = pure_pred in
   match pure_pred with
   | Arith (op, x1, x2) -> [ args, Arith (op, x1, x2) ]
+  | Field (p, c, xs) -> [ args, Field (p, c, xs)]
   | And (p1, p2) -> 
       let p1_inst = instantiate_pred fname assign ([], p1) in
       let p2_inst = instantiate_pred fname assign ([], p2) in

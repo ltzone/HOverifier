@@ -1,5 +1,8 @@
+## Function as return value
+
 ## Support for more types of variables
 
+- restrict to second-order
 
 ## "Auxiliary variables" or ghost variables
 

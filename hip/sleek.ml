@@ -6,6 +6,7 @@ exception TestFailedException of string
 
 let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
 
+
 let print_assignment_groups vs =
   print_endline "[[[[[candidate assignments ]]]]]";
   List.iter (fun vs' ->
@@ -181,14 +182,16 @@ let logical_proposition_to_expr env ctx fname {pargs; pbody; _} : Expr.expr =
 
 
 let logical_proposition_to_expr_imply env ctx fname {pargs; pbody; _} : Expr.expr =
-  let arg_list = List.map fst pargs in
+  (* let arg_list = List.map fst pargs in *)
+  let ty_info = pargs @ (List.concat_map fst pbody) in
+  let env = List.fold_left (fun env (argv, argt) -> Env.add_vtype env argv argt) env ty_info in
   let arg_ty_list = List.map ((encode_ty ctx)) (List.map (snd) pargs) in
   let var_list = List.map (encode_arg ctx) pargs in
-  let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in
+  (* let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in *)
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
-  forall_formula_of env ctx arg_list 
+  forall_formula_of_ty ctx pargs 
     (Boolean.mk_implies ctx 
-      (exists_formula_of env ctx ex_vars (pure_preds_to_expr env ctx (List.map snd pbody)))
+      ((ext_pure_preds_to_expr env ctx (pbody)))
       (FuncDecl.apply fun_decl var_list) 
       )
 
@@ -469,6 +472,7 @@ let check_pure env (pre: (pred) list)
   Goal.add goal [impl_formula];
   let res = solver_check_bool env ctx goal [] in
   if res then true else 
+    
 
   ((* Step 3: try instantiate from user-defined predicates *)
   let fname_to_instantiate = 
@@ -477,6 +481,8 @@ let check_pure env (pre: (pred) list)
         (VarSet.union (fname_of_pures (pre))
         (fname_of_pures (List.map snd post))))
       (Env.insted_preds env) in
+    (* List.iter (fun v -> print_endline __LOC__; print_endline v) fname_to_instantiate; *)
+    (* print_endline (__LOC__ ^ string_of_int (List.length (SMap.bindings env.ftype_context))); *)
   let fname_sig_to_inst = List.map (Env.lookup_ftype env) fname_to_instantiate in
   let candidates = make_prop_candidates env fname_sig_to_inst in
   print_assignment_groups candidates;

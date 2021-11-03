@@ -9,15 +9,16 @@ let make_sig sigs predicates pty_env =
 
 let make_sig_from_file filename = 
   let open Specparser.Driver in
-  (* let open Hiphop.Spectree in *)
+  let open Hiphop.Spectree in
   let sigs, predicates, pty_env = parse_from_file filename in
   print_endline (string_of_parse (parse_from_file filename));
+  (* print_endline (__LOC__ ^ "\n"^ string_of_int (List.length (Hiphop.Spectree.SMap.bindings pty_env))); *)
   let sigs = Specparser.Prelude.sigs @ sigs in
   let predicates = Specparser.Prelude.predicates @ predicates in
 
-  (* let make_pty_env_sigle ({ pname; pargs; _}: logical_proposition) pty_map =
+  let make_pty_env_sigle ({ pname; pargs; _}) pty_map =
     SMap.add pname  (List.map snd pargs) pty_map in
-  let pty_env = List.fold_right make_pty_env_sigle predicates SMap.empty in *)
+  let pty_env = List.fold_right make_pty_env_sigle predicates pty_env in
   make_sig sigs predicates pty_env
 
 let test () = 
@@ -30,6 +31,7 @@ let test () =
   let input_program = input_module ^ ".ml" in
   let input_spec = input_module ^ ".ml" in
   let env = make_sig_from_file input_spec in
+  (* print_endline (__LOC__ ^ string_of_int (List.length (Hiphop.Spectree.SMap.bindings env.ftype_context))); *)
   let ic = open_in input_program in
   print_endline ("[TEST] " ^ module_name);
   let output = ref "\nResult:" in

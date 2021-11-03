@@ -431,7 +431,6 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
 
     let pure_env, inferred_post_pure = normalize_cond inferred_env inferred_post in
 
-
     let pure_check = Sleek.check_pure pure_env ( inferred_post_pure ) post_pure in
 
     let check_post_spec (expect_spec:fun_signature) : bool = 

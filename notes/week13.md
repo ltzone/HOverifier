@@ -1,3 +1,6 @@
+## Support for more types of variables
+
+
 ## "Auxiliary variables" or ghost variables
 
 ```OCaml

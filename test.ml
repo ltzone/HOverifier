@@ -63,17 +63,22 @@ let ibSort = Datatype.mk_sort_s ctx "IntOrBool"
 
 let nil_constr = Datatype.mk_constructor_s ctx "Nil" (Symbol.mk_string ctx "Nil") [] [] []
 
+let nil_constr2 = Datatype.mk_constructor_s ctx "Nil" (Symbol.mk_string ctx "Nil") [] [] []
+
+
 let cons_constr = Datatype.mk_constructor_s ctx "Cons" (Symbol.mk_string ctx "Cons") 
 [Symbol.mk_string ctx "Cons_1"; Symbol.mk_string ctx "Cons_2" ] 
 [Some intSort; None]
 [1; 0]
 
 let lisSort = Datatype.mk_sort_s ctx "list"
-  [nil_constr; cons_constr]
+  [nil_constr; nil_constr; nil_constr;  cons_constr]
 
 let e2 = Expr.mk_const_s ctx "random2" lisSort
 
 let nilDecl = Datatype.Constructor.get_constructor_decl nil_constr
+
+(* let nilDecl2 = Datatype.Constructor.get_constructor_decl nil_constr2 *)
 
 let intv2 = FuncDecl.apply nilDecl []
 

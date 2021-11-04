@@ -7,7 +7,7 @@ exception TestFailedException of string
 let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length xs))
 
 
-let encode_ty env ctx = function
+let encode_ty env = let ctx = env.ctx in function
 | Int -> Some (Arithmetic.Integer.mk_sort ctx)
 | Bool -> Some (Boolean.mk_sort ctx)
 | Arrow _ -> 
@@ -15,15 +15,15 @@ let encode_ty env ctx = function
     (* None *)
 | Tvar a -> 
     let tsort = Env.lookup_adt_sort env a in
-    Some (tsort ctx)
+    Some (tsort)
 
-let encode_arg env ctx = function
+let encode_arg env = let ctx = env.ctx in function
 | (v, Int) -> Some (Arithmetic.Integer.mk_const_s ctx v)
 | (v, Bool) -> Some (Boolean.mk_const_s ctx v)
 | (_, Arrow _) -> None
 | (v, Tvar a) ->
     let tsort = Env.lookup_adt_sort env a in
-    Some (Expr.mk_const_s ctx v (tsort ctx))
+    Some (Expr.mk_const_s ctx v (tsort))
 
 
 let print_assignment_groups vs =
@@ -53,55 +53,60 @@ let list_intersect a b =
   VarSet.elements a_set_b
 
 
-let forall_formula_of env ctx xs formula =
+let forall_formula_of env xs formula =
+  let ctx = env.ctx in
   let xs = List.filter_map (fun v -> 
       let vty = Env.lookup_vtype env v in
-      match (encode_ty env ctx vty) with
+      match (encode_ty env vty) with
       | Some ty ->  Some (Expr.mk_const_s ctx v ty)
       | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_forall_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
-let exists_formula_of env ctx xs formula =
+let exists_formula_of env xs formula =
+  let ctx = env.ctx in
   let xs = List.filter_map (fun v -> 
       let vty = Env.lookup_vtype env v in
-      match (encode_ty env ctx vty) with
+      match (encode_ty env vty) with
       | Some ty ->  Some (Expr.mk_const_s ctx v ty)
       | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
-let forall_formula_of_ty env ctx xs formula =
+let forall_formula_of_ty env xs formula =
+  let ctx = env.ctx in
   let xs = List.filter_map (fun (v, vty) -> 
-    match (encode_ty env ctx vty) with
+    match (encode_ty env vty) with
       | Some ty ->  Some (Expr.mk_const_s ctx v ty)
       | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_forall_const ctx xs formula 
                         (Some 1) [] [] None None) 
                         
-let exists_formula_of_ty env ctx xs formula =
+let exists_formula_of_ty env xs formula =
+  let ctx = env.ctx in
   let xs = List.filter_map (fun (v, vty) -> 
-    match (encode_ty env ctx vty) with
+    match (encode_ty env vty) with
       | Some ty ->  Some (Expr.mk_const_s ctx v ty)
       | None -> None ) xs in
   if List.length xs = 0 then formula else
   Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
-let rec expr_to_expr env ctx exp : Expr.expr = 
-  print_endline (logical_exp_to_string exp);
+let rec expr_to_expr env exp : Expr.expr = 
+  let ctx = env.ctx in
+  (* print_endline (__LOC__ ^ ": " ^ logical_exp_to_string exp); *)
   match exp with
   | Pvar v  -> 
       let vty = Env.lookup_vtype env v in
-      (match (encode_ty env ctx vty) with
+      (match (encode_ty env vty) with
       | Some ty -> Expr.mk_const_s ctx v ty
       | None -> failwith (v ^ " can't have function type"))
   | Lvar v -> 
       let vty = Env.lookup_vtype env v in
-      (match (encode_ty env ctx vty) with
+      (match (encode_ty env vty) with
       | Some ty -> Expr.mk_const_s ctx v ty
       | None -> failwith (v ^ " can't have function type"))
   (* | Fun (f, vs) -> 
@@ -114,75 +119,84 @@ let rec expr_to_expr env ctx exp : Expr.expr =
   | Const (Int n) -> Arithmetic.Integer.mk_numeral_i ctx n
   | Const (Bool i) -> if i then Boolean.mk_true ctx else Boolean.mk_false ctx
   | Op (oper , t1, t2) -> 
-    let t1_expr = expr_to_expr env ctx t1 in
-    let t2_expr = expr_to_expr env ctx t2 in
+    let t1_expr = expr_to_expr env t1 in
+    let t2_expr = expr_to_expr env t2 in
     match oper with 
   | Plus -> Arithmetic.mk_add ctx [t1_expr ; t2_expr ]
   | Minus -> Arithmetic.mk_sub ctx [t1_expr ; t2_expr ]
   | Mult -> Arithmetic.mk_mul ctx [t1_expr ; t2_expr ]
   | Eqb -> Boolean.mk_eq ctx t1_expr t2_expr
 
-let rec pure_pred_to_expr env ctx pred : Expr.expr =
+let rec pure_pred_to_expr env pred : Expr.expr =
+  let ctx = env.ctx in
   let thinned_pred = thin_pred pred in
   match thinned_pred with
   | Arith (oper, t1, t2) ->
-      let t1_exp = expr_to_expr env ctx t1 in
-      let t2_exp = expr_to_expr env ctx t2 in
+      let t1_exp = expr_to_expr env t1 in
+      let t2_exp = expr_to_expr env t2 in
       let oper_fun = match oper with
       | Eq -> Boolean.mk_eq
         (* fun ctx e1 e2 -> Boolean.mk_and ctx [Arithmetic.mk_le ctx e1 e2 ; Arithmetic.mk_le ctx e2 e1 ] *)
       | Le -> Arithmetic.mk_le in (* TODO: is this correct? *)
       oper_fun ctx t1_exp t2_exp
   | Field (p, c, xs) ->
-      let xs_exp = List.map (expr_to_expr env ctx) xs in
-      let constr_decl = (Env.lookup_adt_constr env c) ctx in
-      let p_sort = (Env.lookup_adt_sort env p) ctx in
+      let xs_exp = List.map (expr_to_expr env) xs in
+      let constr_decl = (Env.lookup_adt_constr env c) in
+      let p_type = match Env.lookup_vtype env p with
+      | Tvar t -> t
+      | _ -> failwith (p ^ " does not have an ADT type, field access not allowed")  in
+      let p_sort = (Env.lookup_adt_sort env p_type) in
       let p_expr = Expr.mk_const_s ctx p p_sort in
+      print_endline (String.concat ","
+        (List.map (fun exp -> Sort.to_string (Expr.get_sort exp )) xs_exp)
+      );
+      (* print_endline __LOC__;
+      print_endline (FuncDecl.to_string @@ Datatype.Constructor.get_constructor_decl constr_decl); *)
       Boolean.mk_eq ctx p_expr (FuncDecl.apply
         (Datatype.Constructor.get_constructor_decl constr_decl) xs_exp)
   | And (p1, p2) ->
-      let p1_exp = pure_pred_to_expr env ctx p1 in
-      let p2_exp = pure_pred_to_expr env ctx p2 in
+      let p1_exp = pure_pred_to_expr env p1 in
+      let p2_exp = pure_pred_to_expr env p2 in
       Boolean.mk_and ctx [p1_exp; p2_exp]
   (* | Or (p1, p2) -> 
     let p1_exp = pure_pred_to_goal ctx p1 in
     let p2_exp = pure_pred_to_goal ctx p2 in
       Boolean.mk_or ctx [p1_exp; p2_exp] *)
   | Neg p ->
-      let p = pure_pred_to_expr env ctx p in
+      let p = pure_pred_to_expr env p in
       Boolean.mk_not ctx p
   | Prop (p, vs) ->
-      let arg_list = List.map (fun v -> Option.get (encode_ty env ctx (v))) (snd (Env.lookup_ftype env p)) in
+      let arg_list = List.map (fun v -> Option.get (encode_ty env (v))) (snd (Env.lookup_ftype env p)) in
       let target_sort = Boolean.mk_sort ctx in
       let fun_decl = FuncDecl.mk_func_decl_s ctx p arg_list target_sort in
       let fun_args = 
-        List.map (expr_to_expr env ctx) vs  in
+        List.map (expr_to_expr env) vs  in
       Expr.mk_app ctx fun_decl fun_args
   | True -> Boolean.mk_true ctx
   | False -> Boolean.mk_false ctx
 
-let pure_preds_to_expr env ctx preds : Expr.expr =
+let pure_preds_to_expr env preds : Expr.expr =
+  let ctx = env.ctx in
   let fold_or pred expr =
-    (* print_endline (__LOC__);
-    print_endline (Env.all_adts env ctx); *)
-    let pred_expr = pure_pred_to_expr env ctx pred in
+    let pred_expr = pure_pred_to_expr env pred in
     Boolean.mk_or ctx [pred_expr; expr] in
   List.fold_right fold_or preds (Boolean.mk_false ctx) 
 
-let ext_pure_preds_to_expr env ctx preds : Expr.expr =
+let ext_pure_preds_to_expr env preds : Expr.expr =
+  let ctx = env.ctx in
   let fold_or (args, pred) expr =
-    let pred_expr = pure_pred_to_expr env ctx pred in
-    let pred_quanti = exists_formula_of_ty env ctx args pred_expr in
+    let pred_expr = pure_pred_to_expr env pred in
+    let pred_quanti = exists_formula_of_ty env args pred_expr in
     Boolean.mk_or ctx [pred_quanti; expr] in
   List.fold_right fold_or preds (Boolean.mk_false ctx) 
 
-let solver_wrapper ctx goal : bool =
+let solver_wrapper ctx goal_formulas : bool =
   (* discharge a goal by solving its negation
      so that uninterpreted functions can be universally quantified on toplevel
   *)
   let solver = (Solver.mk_simple_solver ctx) in
     let f e = (Solver.add solver [ Boolean.mk_not ctx e ]) in
-      ignore (List.map f (Goal.get_formulas goal)) ;
+      ignore (List.map f goal_formulas) ;
     let q = (Solver.check solver []) in
       if q == UNSATISFIABLE then 
         (Printf.printf "Solver says: %s\n" (Solver.string_of_status q) ;
@@ -200,30 +214,36 @@ let solver_wrapper ctx goal : bool =
         List.iter (fun v -> print_endline (FuncDecl.to_string v)) n ; false
 
 
-let logical_proposition_to_expr env ctx fname {pargs; pbody; _} : Expr.expr =
+let logical_proposition_to_expr env fname {pargs; pbody; _} : Expr.expr =
+  let ctx = env.ctx in
   let arg_list = List.map fst pargs in
-  let arg_ty_list = List.filter_map ((encode_ty env ctx)) (List.map (snd) pargs) in
-  let var_list = List.filter_map (encode_arg env ctx) pargs in
+  let arg_ty_list = List.filter_map ((encode_ty env)) (List.map (snd) pargs) in
+  let var_list = List.filter_map (encode_arg env) pargs in
   let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
-  forall_formula_of env ctx arg_list 
+  forall_formula_of env arg_list 
     (Boolean.mk_eq ctx 
-      (exists_formula_of env ctx ex_vars (pure_preds_to_expr env ctx (List.map snd pbody)))
+      (exists_formula_of env ex_vars (pure_preds_to_expr env (List.map snd pbody)))
       (FuncDecl.apply fun_decl var_list) 
       )
 
 
-let logical_proposition_to_expr_imply env ctx fname {pargs; pbody; _} : Expr.expr =
+let logical_proposition_to_expr_imply env fname x: Expr.expr =
+  let {pargs; pbody; _}  = x in
   (* let arg_list = List.map fst pargs in *)
+  let ctx = env.ctx in
   let ty_info = pargs @ (List.concat_map fst pbody) in
   let env = List.fold_left (fun env (argv, argt) -> Env.add_vtype env argv argt) env ty_info in
-  let arg_ty_list = List.filter_map ((encode_ty env ctx)) (List.map (snd) pargs) in
-  let var_list = List.filter_map (encode_arg env ctx) pargs in
+  let arg_ty_list = List.filter_map ((encode_ty env)) (List.map (snd) pargs) in
+  let var_list = List.filter_map (encode_arg env) pargs in
   (* let ex_vars = list_diff (VarSet.elements (fvars_of_pures (List.map snd pbody))) arg_list in *)
   let fun_decl = FuncDecl.mk_func_decl_s ctx fname arg_ty_list (Boolean.mk_sort ctx) in
-  forall_formula_of_ty env ctx pargs 
+  (* let _ = (ext_pure_preds_to_expr env (pbody)) in *)
+  (* print_endline __LOC__;
+  print_endline (logical_proposition_to_string x); *)
+  forall_formula_of_ty env pargs 
     (Boolean.mk_implies ctx 
-      ((ext_pure_preds_to_expr env ctx (pbody)))
+      ((ext_pure_preds_to_expr env (pbody)))
       (FuncDecl.apply fun_decl var_list) 
       )
 
@@ -252,20 +272,22 @@ z3 Cannot synthesize a fpure itself!
 
 
 
-let solver_check_bool env ctx goal (cand: prop_candidates) =
+let solver_check_bool env goal_formulas (cand: prop_candidates) =
   print_length(cand);
+  let ctx = env.ctx in
   let solver = (Solver.mk_simple_solver ctx) in
     let f e = 
       (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
     Solver.add solver [ Boolean.mk_not ctx e ] in
-      ignore (List.map f (Goal.get_formulas goal)) ;
+      ignore (List.map f goal_formulas) ;
     List.iter (fun (fname, fbody) ->
       let post_extv = List.fold_right (@) (List.map fst (fbody.pbody)) [] in
       let post_extv = fbody.pargs @ post_extv in
       let env' = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env post_extv in
-      print_endline (Expr.to_string (logical_proposition_to_expr env' ctx fname fbody));
+      (* (print_endline __LOC__;
+      print_endline @@ Expr.to_string (logical_proposition_to_expr env' fname fbody)); *)
       Solver.add solver
-      [logical_proposition_to_expr env' ctx fname fbody]) cand;
+      [logical_proposition_to_expr env' fname fbody]) cand;
     let q = (Solver.check solver []) in
       if q == UNSATISFIABLE then true
       else
@@ -278,20 +300,26 @@ let solver_check_bool env ctx goal (cand: prop_candidates) =
       (Printf.printf "Entailment fail\n") ;
       Printf.printf "Model: \n%s\n" (Model.to_string m);
       let n = (Model.get_const_decls m) in    
-        List.iter (fun v -> print_endline (FuncDecl.to_string v)) n; false
+        List.iter (fun v -> print_endline (FuncDecl.to_string v)) n;
+         false
 
 
 
-let solver_check_bool_imply env ctx goal (cand: prop_candidates) =
+let solver_check_bool_imply env goal_formulas (cand: prop_candidates) =
+  let ctx = env.ctx in
   let solver = (Solver.mk_simple_solver ctx) in
     let f e = 
       (* (print_endline (Expr.to_string (Boolean.mk_not ctx e)); *)
     Solver.add solver [ Boolean.mk_not ctx e ] in
-      ignore (List.map f (Goal.get_formulas goal)) ;
+      ignore (List.map f goal_formulas) ;
     List.iter (fun (fname, fbody) -> 
-      print_endline (Expr.to_string (logical_proposition_to_expr_imply env ctx fname fbody));
+      (* print_endline __LOC__;
+      print_endline (Expr.to_string (logical_proposition_to_expr_imply env fname fbody));
+      print_endline __LOC__; *)
       Solver.add solver
-      [logical_proposition_to_expr_imply env ctx fname fbody]) cand;
+      [logical_proposition_to_expr_imply env fname fbody]) cand;
+      print_endline __LOC__;
+    print_endline (Solver.to_string solver);
     let q = (Solver.check solver []) in
       if q == UNSATISFIABLE then true
       else
@@ -351,6 +379,7 @@ let make_prop_candidates env (fnames: (fun_id * exp_type list) list) :
 
 
 let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res = 
+  let ctx = env.ctx in
 (* For client signature GIVEN Z1, pre1 *-> exist x.post1
    and server signature GIVEN Z2, pre2 *-> exist y.post2
    fun1 <: fun2 should be encoded into
@@ -399,36 +428,34 @@ let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res =
   let spec1_ex = list_diff spec1_ex shared_ex in
   let spec2_ex = list_diff spec2_ex shared_ex in *)
 
-  let cfg = [("model", "true"); ("proof", "true")] in
-  let ctx = (mk_context cfg) in
-  let goal = Goal.mk_goal ctx true true true in 
-  (*print_endline (pure_preds_to_string pre); *)
-  let pre_formula = (pure_preds_to_expr env ctx pre) in
-  let pre1_formula = (pure_preds_to_expr env ctx (List.map snd fun1.fpre.pure)) in
-  let pre2_formula = (pure_preds_to_expr env ctx (List.map snd fun2.fpre.pure)) in
-  print_endline __LOC__;
-  let post1_formula = (pure_preds_to_expr env ctx (List.map snd (snd fun1.fpost).pure)) in
-  let post2_formula = (pure_preds_to_expr env ctx (List.map snd (snd fun2.fpost).pure)) in
+  let pre_formula = (pure_preds_to_expr env pre) in
+  let pre1_formula = (pure_preds_to_expr env (List.map snd fun1.fpre.pure)) in
+  let pre2_formula = (pure_preds_to_expr env (List.map snd fun2.fpre.pure)) in
+  let post1_formula = (pure_preds_to_expr env (List.map snd (snd fun1.fpost).pure)) in
+  let post2_formula = (pure_preds_to_expr env (List.map snd (snd fun2.fpost).pure)) in
+  (* print_endline __LOC__;
+  print_endline (Sort.to_string (Expr.get_sort pre_formula));
+  print_endline ( (Expr.to_string pre_formula));
+  print_endline ( (Expr.to_string pre2_formula)); *)
   let impl_formula_lhs = Boolean.mk_and ctx [pre_formula; pre2_formula] in
   let impl_formula_rhs = Boolean.mk_and ctx [
       pre1_formula;
-      (* forall_formula_of env ctx shared_ex *)
         (Boolean.mk_implies ctx
-        (exists_formula_of_ty env ctx y' post1_formula)
-        (exists_formula_of_ty env ctx y post2_formula)
+        (exists_formula_of_ty env y' post1_formula)
+        (exists_formula_of_ty env y post2_formula)
       )
   ] in
-  let quanti_rhs = exists_formula_of_ty env ctx x' impl_formula_rhs in
+  let quanti_rhs = exists_formula_of_ty env x' impl_formula_rhs in
   let impl_formula = Boolean.mk_implies ctx impl_formula_lhs quanti_rhs in
-  let quanti_formula = forall_formula_of_ty env ctx x impl_formula in
+  let quanti_formula = forall_formula_of_ty env x impl_formula in
   (* let quanti_formula = Boolean.mk_and ctx
     [;
     quanti_formula] in *)
-  Goal.add goal [quanti_formula];
+  let goal_formulas = [quanti_formula] in
   print_endline (__LOC__ ^ Expr.to_string (quanti_formula));
   
 (* Step 2: try high level verification *)
-  let ho_verif = solver_check_bool env ctx goal [] in
+  let ho_verif = solver_check_bool env goal_formulas [] in
   if ho_verif then (Success) else
 (
 (* Step 3: try instantiate from user-defined predicates *)
@@ -443,13 +470,14 @@ let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res =
   let candidates = make_prop_candidates env fname_sig_to_inst in
   print_assignment_groups candidates;
   let feasible_candidates =
-    List.filter (solver_check_bool env ctx goal) candidates in
+    List.filter (solver_check_bool env goal_formulas) candidates in
   if List.length feasible_candidates = 0 then Fail else
     Inst feasible_candidates
 )
 
-let make_goal env ctx (pre:( pred) list) 
+let make_goal env  (pre:( pred) list) 
 (post:((program_var * exp_type) list * pred) list) prog_vars =
+  let ctx = env.ctx in
 
   let post_extv = List.fold_right (@) (List.map fst post) [] in
   let env = List.fold_left (fun env (v, vty) -> Env.add_vtype env v vty) env post_extv in
@@ -461,8 +489,8 @@ let make_goal env ctx (pre:( pred) list)
   let forall_vars = VarSet.elements pre_fvs in
   let exists_vars = VarSet.elements post_exs in 
 
-  let pre_formula = (pure_preds_to_expr env ctx pre) in
-  let post_formula = (ext_pure_preds_to_expr env ctx post) in
+  let pre_formula = (pure_preds_to_expr env pre) in
+  let post_formula = (ext_pure_preds_to_expr env post) in
 
 
   (* let is = (Arithmetic.Integer.mk_sort ctx) in *)
@@ -495,14 +523,11 @@ let check_pure env (pre: (pred) list)
   print_endline ("[post] " ^ ext_pure_preds_to_string post);
 
 
-  let cfg = [("model", "true"); ("proof", "true")] in
-  let ctx = (mk_context cfg) in
-  let goal = Goal.mk_goal ctx true true true in 
+  let impl_formula = make_goal env pre post (env.prog_vars) in
+  print_endline (Expr.to_string impl_formula);
 
-  let impl_formula = make_goal env ctx pre post (env.prog_vars) in
-
-  Goal.add goal [impl_formula];
-  let res = solver_check_bool env ctx goal [] in
+  let goal = [impl_formula] in
+  let res = solver_check_bool env goal [] in
   if res then true else 
     
 
@@ -528,15 +553,12 @@ let check_pure env (pre: (pred) list)
     (* let inst_post = instantiate_pure_preds candidate post in *)
 
 
-    let cfg = [("model", "true"); ("proof", "true")] in
-    let ctx = (mk_context cfg) in
-    let goal = Goal.mk_goal ctx true true true in 
+    let impl_formula = make_goal env pre post (env.prog_vars) in
 
-    let impl_formula = make_goal env ctx pre post (env.prog_vars) in
-
-    Goal.add goal [impl_formula];
-    print_endline (Z3.Expr.to_string impl_formula);
-    solver_check_bool_imply env ctx goal candidate
+    let goal_formula = [impl_formula] in
+    (* print_endline __LOC__;
+    print_endline (Z3.Expr.to_string impl_formula); *)
+    solver_check_bool_imply env goal_formula candidate
   in
 
   let feasible_candidates =

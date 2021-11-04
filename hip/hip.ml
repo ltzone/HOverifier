@@ -298,13 +298,14 @@ let open Parsetree in
           *)
           (* The argument list is 0, so we can safely check only the pure part, 
             there should be no spec part describing the funtion arguments *)
+          (  print_endline __LOC__;
           if Sleek.check_pure env pre_cond fpre.pure then
             let fresh_name = Env.get_fresh_res_name env in
             let fresh_ty = snd (fst fpost)in
             let new_env = Env.add_vtype env var_name fresh_ty in
             let subst_post = subst_pred_normal_form (fst (fst fpost)) fresh_name (snd fpost) in
             ( Env.add_specs_to_fn fresh_name subst_post.spec new_env, fresh_name, { subst_post with spec=[]} )
-          else ( env, var_name, acc )
+          else ( env, var_name, acc ))
       )
     ))
 
@@ -402,10 +403,13 @@ let open Parsetree in
                   env f_acc.spec in 
       let f_acc = {pure=pre_cond; spec=[]} in
 
+      let fresh_anchor = Env.get_fresh_res_name env in
+
       (* Step 1: add case constraint *)
-      case_list |>
-      List.concat_map
-      (fun {pc_lhs; pc_rhs; _} ->
+      List.fold_left
+      (fun last_res {pc_lhs; pc_rhs; _} ->
+        last_res |> List.concat_map
+        (fun (env, last_anchor, last_cond) ->
           match pc_lhs.ppat_desc with
           | Ppat_construct (pat_name, pat_args) ->
               let pat_name = string_of_ident pat_name.txt in
@@ -424,9 +428,18 @@ let open Parsetree in
               (* add type information *)
               let new_env = List.fold_left (fun old_env (v, vty) -> Env.add_vtype old_env v vty) new_env pat_args_pairs in
               let inferred_cond = add_constraint f_acc new_constraint in
-              infer_of_expression new_env inferred_cond pc_rhs
+              infer_of_expression new_env inferred_cond pc_rhs |>
+              List.map (fun (env', anchor', acc') ->
+                (* at least one solution, so we can complete the type information of unified anchor here *)
+                let unified_anchor_ty = Env.lookup_vtype env' anchor' in
+                let env' = Env.add_vtype env' last_anchor unified_anchor_ty in
+                
+                let subst_acc = subst_pred_normal_form anchor' last_anchor acc' in
+                (env', last_anchor,
+                  {pure=last_cond.pure @ subst_acc.pure;
+                   spec=last_cond.spec @ subst_acc.spec }))
           | _ -> failwith "Other pattern matching not available"
-      ))   
+      )) [(env, fresh_anchor, {pure=[]; spec=[]})]  case_list )
   
   | _ -> assert false
     in 
@@ -466,6 +479,8 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
     let post_spec = ( substed_post.spec ) in
 
     let pure_env, inferred_post_pure = normalize_cond inferred_env inferred_post in
+
+    (* print_endline __LOC__; *)
 
     let pure_check = Sleek.check_pure pure_env ( inferred_post_pure ) post_pure in
 

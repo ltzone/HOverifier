@@ -391,6 +391,8 @@ module SSet = Set.Make(String)
 
 type env = {
 
+ctx : Z3.context;
+
 (* module name -> a bunch of function specs *)
 specs : fun_signature list SMap.t;
 
@@ -429,14 +431,15 @@ vtype_context: exp_type SMap.t;
 (* map adt-constructor name to argument type list *)
 adt_type_context: (exp_type list) SMap.t;
 
-adt_constr_decls: (Z3.context -> Z3.Datatype.Constructor.constructor) SMap.t;
+adt_constr_decls: (Z3.Datatype.Constructor.constructor) SMap.t;
 
-adt_decls: (Z3.context -> Z3.Sort.sort) SMap.t;
+adt_decls: (Z3.Sort.sort) SMap.t;
 }
 
 
 module Env = struct
 let empty = {
+  ctx = Z3.mk_context [("model", "true"); ("proof", "true")];
   specs = SMap.empty;
   res_index = ref 0;
   predicates = [];
@@ -449,15 +452,15 @@ let empty = {
   adt_decls = SMap.empty;
 }
 
-let all_adts env ctx =
+let all_adts env =
   let adt_ty_ctx_str = List.map (fun (k, v) -> k ^ ":" ^ 
     String.concat ","  @@
   List.map string_of_ty v) (SMap.bindings env.adt_type_context) in
   let adt_constr_decls_str = List.map (fun (k, v) -> k ^ ":" ^ 
-   Z3.FuncDecl.to_string (Z3.Datatype.Constructor.get_constructor_decl (v ctx)) ) 
+   Z3.FuncDecl.to_string (Z3.Datatype.Constructor.get_constructor_decl (v)) ) 
   (SMap.bindings env.adt_constr_decls) in
   let adt_constr_sort_str = List.map (fun (k, v) -> k ^ ":" ^ 
-   Z3.Sort.to_string (v ctx)) 
+   Z3.Sort.to_string (v)) 
   (SMap.bindings env.adt_decls) in
   String.concat "\n" adt_ty_ctx_str ^
   String.concat "\n" adt_constr_decls_str ^
@@ -474,6 +477,7 @@ let lookup_adt_sort env ty_str = match SMap.find_opt ty_str env.adt_decls with
 let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
   let open Frontend.Parsetree in
   let open Z3 in
+  let ctx = env.ctx in
   let ty_name = decl.ptype_name.txt in
   match decl.ptype_kind with
   | Ptype_variant constr_list -> 
@@ -490,7 +494,7 @@ let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
               | _ -> print_endline (constr_name)
               ;failwith "Other type variables not supported[1]" in
             let args =  List.concat_map collect_args arg_tys in
-            let decl_exprs = (fun ctx ->
+            let decl_exprs = (
               let field_symbols = List.init (List.length args) 
                   (fun i -> Symbol.mk_string ctx (constr_name ^ "_" ^ string_of_int i)) in
               let decide_ty ty_str =
@@ -498,7 +502,7 @@ let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
                 else if String.equal ty_str "bool" then (Some (Boolean.mk_sort ctx), 1)
                 else if String.equal ty_str ty_name then (None, 0)
                 else (let decl_sort = lookup_adt_sort env ty_str in
-                  (Some (decl_sort ctx), 1))) in
+                  (Some (decl_sort), 1))) in
               let field_sorts = List.map decide_ty args in
               Datatype.mk_constructor_s ctx constr_name
                 (Symbol.mk_string ctx constr_name) 
@@ -515,8 +519,8 @@ let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
             (constr_name, (decl_exprs, decl_tys))
         | _ -> failwith "Other type declarations not supported[2]"
       ) constr_list in
-    let adt_sort = (fun ctx ->
-      Datatype.mk_sort_s ctx ty_name (List.map (fun v -> v ctx) (List.map (fun v -> fst (snd v)) decls))
+    let adt_sort = (
+      Datatype.mk_sort_s ctx ty_name (List.map (fun v -> v) (List.map (fun v -> fst (snd v)) decls))
     ) in
     {
       env with

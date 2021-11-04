@@ -49,9 +49,14 @@ let test () =
       | _ -> None
       ) progs) in
     let env = List.fold_left (Hiphop.Spectree.Env.add_adt_decl) env prog_tys in
+    (* let cfg = [("model", "true"); ("proof", "true")] in
+    let ctx = (Z3.mk_context cfg) in *)
     (* let ctx  = Z3.mk_context [] in *)
-    (* print_endline __LOC__;
-    print_endline (Hiphop.Spectree.Env.all_adts env ctx); *)
+    (* let solver = (Z3.Solver.mk_simple_solver env.ctx) in *)
+    (* print_endline __LOC__; *)
+    (* print_endline (Z3.Solver.to_string solver); *)
+    (* print_endline (String.concat "," (List.map fst @@ Hiphop.Spectree.SMap.bindings env.adt_constr_decls)); *)
+    (* print_endline (Z3.Expr.to_string @@ Z3.FuncDecl.apply (Z3.Datatype.Constructor.get_constructor_decl (Hiphop.Spectree.SMap.find "Nil" env.adt_constr_decls )) []); *)
 
     let progs = List.filter_map (fun prog ->
       match prog.pstr_desc with

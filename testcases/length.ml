@@ -2,14 +2,14 @@ type list = Nil
           | Cons of (int * list)
 
 (*@ pred LL(n:int,l:list) |= l::Nil<> & n=0
-          or EX (q:list), l::Cons<i,q> & LL( n - 1 , q)
+          or EX (i:int) (q:list), l::Cons<i,q> & LL( n - 1 , q)
     @*)
 
 
 let rec length lst =
 (*@ 
    declare length(lst:list)
-   requires      { LL(n,lst) }
+   requires      { EX (n:int), LL(n,lst) }
    ensures[res]   { res = n } 
 
 //   Requires      lst::Nil

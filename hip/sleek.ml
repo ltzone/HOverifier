@@ -10,7 +10,9 @@ let print_length xs = print_endline ("Length is :" ^ string_of_int (List.length 
 let encode_ty env ctx = function
 | Int -> Some (Arithmetic.Integer.mk_sort ctx)
 | Bool -> Some (Boolean.mk_sort ctx)
-| Arrow _ -> None
+| Arrow _ -> 
+    Some (Sort.mk_uninterpreted_s ctx ("foo"))
+    (* None *)
 | Tvar a -> 
     let tsort = Env.lookup_adt_sort env a in
     Some (tsort ctx)
@@ -89,7 +91,9 @@ let exists_formula_of_ty env ctx xs formula =
   Quantifier.expr_of_quantifier (Quantifier.mk_exists_const ctx xs formula 
                         (Some 1) [] [] None None) 
 
-let rec expr_to_expr env ctx : logical_exp -> Expr.expr = function
+let rec expr_to_expr env ctx exp : Expr.expr = 
+  print_endline (logical_exp_to_string exp);
+  match exp with
   | Pvar v  -> 
       let vty = Env.lookup_vtype env v in
       (match (encode_ty env ctx vty) with
@@ -148,7 +152,7 @@ let rec pure_pred_to_expr env ctx pred : Expr.expr =
       let p = pure_pred_to_expr env ctx p in
       Boolean.mk_not ctx p
   | Prop (p, vs) ->
-      let arg_list = List.init (List.length vs) (fun _ -> (Arithmetic.Integer.mk_sort ctx)) in
+      let arg_list = List.map (fun v -> Option.get (encode_ty env ctx (v))) (snd (Env.lookup_ftype env p)) in
       let target_sort = Boolean.mk_sort ctx in
       let fun_decl = FuncDecl.mk_func_decl_s ctx p arg_list target_sort in
       let fun_args = 
@@ -159,6 +163,8 @@ let rec pure_pred_to_expr env ctx pred : Expr.expr =
 
 let pure_preds_to_expr env ctx preds : Expr.expr =
   let fold_or pred expr =
+    (* print_endline (__LOC__);
+    print_endline (Env.all_adts env ctx); *)
     let pred_expr = pure_pred_to_expr env ctx pred in
     Boolean.mk_or ctx [pred_expr; expr] in
   List.fold_right fold_or preds (Boolean.mk_false ctx) 
@@ -381,8 +387,6 @@ let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res =
   let x = List.concat_map fst fun2.fpre.pure in
   let y' = List.concat_map fst (snd fun1.fpost).pure in
   let y = List.concat_map fst (snd fun2.fpost).pure in
-
-
   (* let spec1_all, spec1_ex = var_quantifier_of_spec fun1 in
   let spec2_all, spec2_ex = var_quantifier_of_spec fun2 in
   let fvar_pre = VarSet.elements (fvars_of_pures (pre)) in
@@ -398,9 +402,11 @@ let check_spec_sub (env:env) (pre: ( pred) list) fun1 fun2 : spec_res =
   let cfg = [("model", "true"); ("proof", "true")] in
   let ctx = (mk_context cfg) in
   let goal = Goal.mk_goal ctx true true true in 
+  (*print_endline (pure_preds_to_string pre); *)
   let pre_formula = (pure_preds_to_expr env ctx pre) in
   let pre1_formula = (pure_preds_to_expr env ctx (List.map snd fun1.fpre.pure)) in
   let pre2_formula = (pure_preds_to_expr env ctx (List.map snd fun2.fpre.pure)) in
+  print_endline __LOC__;
   let post1_formula = (pure_preds_to_expr env ctx (List.map snd (snd fun1.fpost).pure)) in
   let post2_formula = (pure_preds_to_expr env ctx (List.map snd (snd fun2.fpost).pure)) in
   let impl_formula_lhs = Boolean.mk_and ctx [pre_formula; pre2_formula] in

@@ -108,7 +108,7 @@ let check_fun env args fvars spec_to_check (pre:pred list) : spec_res * env =
         let client_spec = Env.find_spec fun_name_in_env env in
         match client_spec with
         (* TODO: try multiple specifications *)
-          | Some (client_spec :: _) -> print_endline __LOC__; Sleek.check_spec_sub env pre client_spec spec
+          | Some (client_spec :: _) ->  Sleek.check_spec_sub env pre client_spec spec
           | _ -> failwith ("No specification found for function " ^ fun_name_in_env)
     in
     (* print_endline ("Spec to check:::::" ^ string_of_int (List.length spec_to_check)); *)
@@ -389,8 +389,44 @@ let open Parsetree in
       let f_acc_f = subst_pred_normal_form bname_f unified_anchor f_acc_f in
       [(new_env, unified_anchor, {pure= f_acc_t.pure @ f_acc_f.pure; spec=f_acc_t.spec @ f_acc_f.spec })] )))
 
+  | Pexp_match (exp, case_list) ->
+      (* Step 0: evaluate the expression *)
+      (infer_of_expression env acc exp) |>
+      List.concat_map
+      (fun (env, bname, f_acc) -> 
 
-  
+      (* Step 0: normalize the condition again *)
+      let pre_cond = f_acc.pure in
+      let env = List.fold_left 
+                  (fun env spec -> Env.add_spec_to_fn spec.fname spec env)
+                  env f_acc.spec in 
+      let f_acc = {pure=pre_cond; spec=[]} in
+
+      (* Step 1: add case constraint *)
+      case_list |>
+      List.concat_map
+      (fun {pc_lhs; pc_rhs; _} ->
+          match pc_lhs.ppat_desc with
+          | Ppat_construct (pat_name, pat_args) ->
+              let pat_name = string_of_ident pat_name.txt in
+              let pat_args_name = (match pat_args with None -> []
+              | Some {ppat_desc=(Ppat_tuple args);_} -> List.map (
+                  fun pat_arg -> match pat_arg.ppat_desc with
+                  | Ppat_var x -> (x.txt)
+                  | _ -> failwith "Other pattern argument not available"
+              ) args
+              | _ -> failwith "Other pattern structure not available") in
+              let pat_args_ty = Env.lookup_constr_arg_ty env pat_name in
+              let pat_args_pairs = List.combine pat_args_name pat_args_ty in
+              let new_constraint =  Field (bname, pat_name, List.map (fun v -> Lvar v) pat_args_name) in
+              (* add global program variable *)
+              let new_env = List.fold_left (fun old_env v -> Env.add_var_name v old_env) env pat_args_name in
+              (* add type information *)
+              let new_env = List.fold_left (fun old_env (v, vty) -> Env.add_vtype old_env v vty) new_env pat_args_pairs in
+              let inferred_cond = add_constraint f_acc new_constraint in
+              infer_of_expression new_env inferred_cond pc_rhs
+          | _ -> failwith "Other pattern matching not available"
+      ))   
   
   | _ -> assert false
     in 

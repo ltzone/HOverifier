@@ -16,10 +16,10 @@ xs::Cons(x,xs')
 
 let rec fold_left f x ys = 
 (*@ 
-declare fold_left(f:int->int->int,x,ys)
+declare fold_left(f:int->int->int,x:int,ys:list)
 given fpure(int,int,int)
-requires { LL_foldl(x,r,xs,fpure) with f(x, y) |= {true} *->:r {fpure(x,y,r)}  }
-ensures[res]  { LL_foldl(x,res,xs,fpure) }
+requires {LL_foldl(x,r,ys,fpure) with f(x, y) |= {true} *->:r {fpure(x,y,r)}  }
+ensures[res]  { LL_foldl(x,res,ys,fpure) }
 @*)
 match ys with
 | Nil -> x

@@ -49,6 +49,9 @@ let test () =
       | _ -> None
       ) progs) in
     let env = List.fold_left (Hiphop.Spectree.Env.add_adt_decl) env prog_tys in
+    (* let ctx  = Z3.mk_context [] in *)
+    (* print_endline __LOC__;
+    print_endline (Hiphop.Spectree.Env.all_adts env ctx); *)
 
     let progs = List.filter_map (fun prog ->
       match prog.pstr_desc with

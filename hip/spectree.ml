@@ -426,6 +426,9 @@ ftype_context: (exp_type list) SMap.t;
 vtype_context: exp_type SMap.t;
 (* the dynamic context to record the types of variables  *)
 
+(* map adt-constructor name to argument type list *)
+adt_type_context: (exp_type list) SMap.t;
+
 adt_constr_decls: (Z3.context -> Z3.Datatype.Constructor.constructor) SMap.t;
 
 adt_decls: (Z3.context -> Z3.Sort.sort) SMap.t;
@@ -441,9 +444,24 @@ let empty = {
   ftype_context = SMap.empty;
   vtype_context = SMap.empty;
   prog_vars = [];
+  adt_type_context = SMap.empty;
   adt_constr_decls = SMap.empty;
   adt_decls = SMap.empty;
 }
+
+let all_adts env ctx =
+  let adt_ty_ctx_str = List.map (fun (k, v) -> k ^ ":" ^ 
+    String.concat ","  @@
+  List.map string_of_ty v) (SMap.bindings env.adt_type_context) in
+  let adt_constr_decls_str = List.map (fun (k, v) -> k ^ ":" ^ 
+   Z3.FuncDecl.to_string (Z3.Datatype.Constructor.get_constructor_decl (v ctx)) ) 
+  (SMap.bindings env.adt_constr_decls) in
+  let adt_constr_sort_str = List.map (fun (k, v) -> k ^ ":" ^ 
+   Z3.Sort.to_string (v ctx)) 
+  (SMap.bindings env.adt_decls) in
+  String.concat "\n" adt_ty_ctx_str ^
+  String.concat "\n" adt_constr_decls_str ^
+  String.concat "\n" adt_constr_sort_str 
 
 let lookup_adt_constr env constr_str = match SMap.find_opt constr_str env.adt_constr_decls with
 | Some v -> v
@@ -464,11 +482,11 @@ let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
         let constr_name = constr.pcd_name.txt in
         match constr.pcd_res, constr.pcd_args with
         | None, Pcstr_tuple arg_tys ->
-          print_endline (string_of_int (List.length arg_tys));
             let rec collect_args arg_ty = 
               match arg_ty.ptyp_desc with
               | Ptyp_constr (tyn, []) -> [ string_of_ident tyn.txt ]
-              | Ptyp_tuple tys -> List.concat_map collect_args tys
+              | Ptyp_tuple tys -> 
+                  List.concat_map collect_args tys
               | _ -> print_endline (constr_name)
               ;failwith "Other type variables not supported[1]" in
             let args =  List.concat_map collect_args arg_tys in
@@ -478,7 +496,7 @@ let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
               let decide_ty ty_str =
                 (if String.equal ty_str "int" then (Some (Arithmetic.Integer.mk_sort ctx), 1)
                 else if String.equal ty_str "bool" then (Some (Boolean.mk_sort ctx), 1)
-                else if String.equal ty_str constr_name then (None, 0)
+                else if String.equal ty_str ty_name then (None, 0)
                 else (let decl_sort = lookup_adt_sort env ty_str in
                   (Some (decl_sort ctx), 1))) in
               let field_sorts = List.map decide_ty args in
@@ -488,16 +506,23 @@ let add_adt_decl (env:env) (decl: Frontend.Parsetree.type_declaration) : env =
                 (List.map fst field_sorts)
                 (List.map snd field_sorts)
             ) in
-            (constr_name, decl_exprs)
+            let decl_tys = 
+              let decide_ty ty_str =
+                (if String.equal ty_str "int" then Int
+                else if String.equal ty_str "bool" then Bool
+                else Tvar ty_str) in
+              List.map decide_ty args in
+            (constr_name, (decl_exprs, decl_tys))
         | _ -> failwith "Other type declarations not supported[2]"
       ) constr_list in
     let adt_sort = (fun ctx ->
-      Datatype.mk_sort_s ctx ty_name (List.map (fun v -> v ctx) (List.map snd decls))
+      Datatype.mk_sort_s ctx ty_name (List.map (fun v -> v ctx) (List.map (fun v -> fst (snd v)) decls))
     ) in
     {
       env with
-      adt_constr_decls= List.fold_left (fun old_map (k , v) -> SMap.add k v old_map) env.adt_constr_decls decls;
-      adt_decls= SMap.add ty_name adt_sort env.adt_decls
+      adt_constr_decls= List.fold_left (fun old_map (k , (v, _)) -> SMap.add k v old_map) env.adt_constr_decls decls;
+      adt_decls= SMap.add ty_name adt_sort env.adt_decls;
+      adt_type_context= List.fold_left (fun old_map (k , (_, v)) -> SMap.add k v old_map) env.adt_type_context decls;
     }
   | _ -> failwith "Other type declarations not supported"
 
@@ -514,8 +539,17 @@ let lookup_ftype env fname =
 let lookup_vtype env vname =
   match SMap.find_opt vname env.vtype_context with
   | Some v_ty -> v_ty
-  | None -> failwith ("Variable type not found for " ^ vname)
+  | None -> 
+    match SMap.find_opt vname env.ftype_context with
+    | Some vs -> List.fold_right (fun v res -> Arrow (v, res) ) vs Bool
+    | None ->   
+    failwith ("Variable type not found for " ^ vname)
 
+let lookup_constr_arg_ty env constr_name =
+  match SMap.find_opt constr_name env.adt_type_context with
+  | Some v_ty -> v_ty
+  | None -> failwith ("Argument type not found for constructor " ^ constr_name)
+  
 let add_vtype env vname vty =
   match SMap.find_opt vname env.vtype_context with
   | Some vty' -> 

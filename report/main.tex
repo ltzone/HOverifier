@@ -2,7 +2,9 @@
 %%% remove it for the final submission, i.e. electronic thesis
 \newcommand*{\DoubleSided}{} 
 
+
 \input{_global_settings.tex}
+\input{triple.tex}
 
 \begin{document}
 
@@ -38,18 +40,16 @@
 \end{frontmatter}
 
 \input{chapters/ch-intro.tex}
-\input{chapters/ch-review.tex}
-\input{chapters/ch-rice.tex}
-\input{chapters/ch-noodle.tex}
+\input{chapters/ch-preliminaries.tex}
+% \input{chapters/ch-review.tex}
+\input{chapters/ch-design.tex}
+\input{chapters/ch-evaluation.tex}
 \input{chapters/ch-concl.tex}
 
 \bookmarksetup{startatroot}
 \printbibliography[heading=bibintoc]
 
 \appendix
-\input{chapters/ap-recipes.tex}
-\input{chapters/ap-ingredients.tex}
-
-\input{chapters/ap-publication.tex} % optional to include your publication list
+% \input{chapters/ap-publication.tex} % optional to include your publication list
 
 \end{document}

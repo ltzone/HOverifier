@@ -1,0 +1,58 @@
+\usepackage{mathpartir}
+% \usepackage{tgschola}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{listings}
+% \lstset{columns=fullflexible}
+
+% Custom notations
+\newcommand{\figref}[1]{Fig.~\ref{#1}}
+\newcommand{\figrefs}[2]{Figures~\ref{#1}\&\ref{#2}}
+\newcommand{\denote}[1]{\llbracket #1 \rrbracket}
+\newcommand{\With}{\mathrm{With} \ \ }
+\newcommand{\Require}{\mathrm{Require} \ \ }
+\newcommand{\Ensure}{\mathrm{Ensure} \ \ }
+\newcommand{\Assert}{\mathrm{Assert} \ \ }
+\newcommand{\Inv}{\mathrm{Inv} \ \ }
+\newcommand{\Givensymbol}{\mathrm{Given}}
+\newcommand{\Given}[3]{\Givensymbol\ #1:#2,\ #3}
+\newcommand{\provable}{\vdash}
+\newcommand{\entails}{\vdash}
+\newcommand{\ofspec}{\vDash}
+\newcommand{\hoare}[6]{\{#1\}\,#2\,\left\{#3, [#4, #5, #6]\right\}}
+\newcommand{\hoareabbr}[4]{\{#1\}\,#2\ _{:\texttt{#3}}\left\{ {#4}\right\}}
+\newcommand{\EX}[3]{\exists #1:#2.\ #3}
+\newcommand{\cskip}{\mathsf{skip}}
+\newcommand{\cifthenelse}[3]{\mathsf{if}\ (#1)\ #2\ \mathsf{else}\ #3}
+\newcommand{\aloop}[4]{\Inv #1; \Inv #2; \cloop{#3}{#4}}
+\newcommand{\cloop}[2]{\mathsf{loop}\ (#2)\ #1}
+\newcommand{\cbreak}{\mathsf{break}}
+\newcommand{\ccontinue}{\mathsf{continue}}
+\newcommand{\creturn}{\mathsf{return}}
+\newcommand{\cvar}[1]{\mathsf{#1}}
+\newcommand{\cnull}{\mathsf{NULL}}
+\newcommand{\coninv}[1]{#1_{\mathrm{con}}}
+\newcommand{\brkcnd}[1]{#1_{\mathrm{brk}}}
+\newcommand{\concnd}[1]{#1_{\mathrm{con}}}
+\newcommand{\retcnd}[1]{#1_{\mathrm{ret}}}
+\newcommand{\cincr}[1]{#1_{\mathrm{incr}}}
+\newcommand{\pure}{\mathsf{pure}}
+\newcommand{\se}{\mathsf{ae}}
+\newcommand{\norm}{\mathsf{norm}}
+\newcommand{\btrue}{\mathsf{true}}
+\newcommand{\bfalse}{\mathsf{false}}
+\newcommand{\hasvalue}{\mathbin{\Downarrow}}
+\newcommand{\findvalue}[3]{#1\entails#2\hasvalue#3}
+\newcommand{\assign}{\mathsf{assign}}
+\newcommand{\complex}{\mathsf{complex}}
+\renewcommand{\implies}{\Rightarrow}
+\newcommand{\rulename}[1]{\textsc{#1}}
+\renewcommand{\ll}{\mathrm{ll}}
+\newcommand{\rev}{\mathrm{rev}}
+\newcommand{\lland}{\ \land\ }
+\newcommand{\revert}{\mathrm{revert}}
+
+
+\newcommand{\atomstmt}{\text{atom\_stmt}}
+\newcommand{\stmt}{\text{stmt}}

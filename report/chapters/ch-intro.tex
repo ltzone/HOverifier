@@ -3,60 +3,31 @@
 \chapter{Introduction}
 \vspace{2em}
 
-\lipsum[1]
 
-\section{Overview}
 
-This section includes some tricks extracted from my years' experience of using \LaTeX{}.
-Rule of thumb: Doing the right things in the right way can your efforts. 
-And I am just the right person telling you this. 
+Many tools have been developed to verify the correctness of a program. One typical method towards program verification is to ask users to write specifications for a given program, and then the verifier will check the correctness of the program by symbolically executing the program expression with respect to the user\zz{}given assertion. The assertion entailment will be encoded to a \emph{verification condition} (VC) in a \emph{satisfiability modulo theory} (SMT) and then discharged by SMT solvers such as Z3. The HIP/SLEEK~\cite{Chin2012HipSleek} system is a mature application using this approach, which has used separation logic to verify heap-manipulating imperative programs.
 
-\subsection{Citing, Referring and Hyperlinks}
+However, automatically verifying programs with higher order functions is a topic yet to be explored. Many automatic verifiers have limited the programming language they want to verify to a first-order language, which only allows users to write program expressions that operate on individual data elements (e.g., strings, integers, records, variants, etc.). By contrast, higher-order programming languages treat functions as first-class values, so that a higher-order function can operate on functions (\emph{function as parameter}) and return a function as result (\emph{function as returned value}). The use of higher-order functions can increase the modularity since they allow programmers to factor out functions and parameterize functions on other functions. In fact, the use of higher order functions is the essence of \emph{functional programming}. It is worth investigating what approaches will be applicable for verifying functional programs.
 
-A book~\cite{BOOK:Gray} is cited.
 
-\begin{figure}[!t]
-  \centering
-  \includegraphics[width=.6\linewidth]{\Pic{pdf}{vege}}
-  \vspace{\BeforeCaptionVSpace}
-  \caption{A collection of food.}
-  \label{intro:fig:vege}
-\end{figure}
+\section{Current Work}
 
-An online article~\cite{tpc-c} is cited.
+The goal of this report is to provide a solution to automatic verification of higher order programs and implement a prototype system to verify several concrete examples of higher order programs. Higher order functional programming languages are generally a very broad concept, encompassing many programming language features. Therefore, the presentation of this report will be driven by higher-order programming examples, to see how far the automatic verification can go in a higher-order setting.
 
-\autoref{intro:fig:vege} demonstrates a collection of vegetables. 
-There are broccoli, carrot, pea, onion, snow bean, scallion, etc.
-They are healthy food characteristic of high-fiber and low-calorie. 
+In this project we take a subset language of OCaml~\cite{OCaml}, an industrial\zz{}strength functional programming language, and explore the automatic verification of higher order functions based on the structure of HIP/SLEEK system.
 
-\begin{align}
-  Q_{a}^{b} &= \sum_{x=1}^{\infty} \dfrac{\prod_{y=1}^{x} f(y) - a}{\lim_{z \to x} g(z) + b} + 
-               \int_{a}^{b} x^2 dx \label{eq:sample:1}\\
-            &= H_{1}(a, b) + H_{2}(a, b) \nonumber\\
-            &= \gamma(a, b) \label{eq:sample:2}
-\end{align}
+Currently, this report focuses on one specific target language OCaml and supports reasoning
+on pure properties on immutable variables. However the techniques such as abstraction
+predicates and nested function specifications in the design of this project can also be extended
+to a larger category of programming languages and features. Our system also has the potential
+to integrate with the HIP/SLEEK system, to enable more sophisticated reasoning on mutable
+data structures.
 
-\autoref{eq:sample:1}, albeit complex, is equivalent to \autoref{eq:sample:2}.
-Note that we do not label the second line of the derivation process.
-Given $f(x) = x^{2}$ and $0 < x \leq 1$, we have
-\[
-  f(1) = 1^{2} = 1
-\]
-and the result is quite simple. 
 
-You may go to \href{https://github.com/streamjoin/nusthesis}{my GitHub repository} by searching for ``nus latex template'' in Google or accessing the url  \url{https://github.com/streamjoin/nusthesis} directly. 
+\section{Report Structure}
 
-You may refer to the \href{run:./src/references.bib}{bibliography file} to see its organization.  
-
-\subsection{Hyphenation}
-
-The compound word ``ingredient\zz{}insensitive'', where the hyphen is generated through command \CMD{\zz{}} will be hyphenated for individual words rather than the compound word as a whole. 
-In contrast, ``nutrition-oriented'' with normal hyphen will be hyphenated as a whole compound word, which is unlikely to be recognized by \LaTeX\ and therefore no hyphenation will be carried out unless you provide customized hyphenation for it. 
-
-\section{Thesis Synopsis}
-
-The rest of this thesis is organized as follows. 
-In \autoref{ch:review}, we conduct a literature review. 
-\autoref{ch:rice} provides the study on rice. 
-\autoref{ch:noodle} describes noodles. 
-We conclude the entire thesis as well as discuss further directions for future research in \autoref{ch:concl}.
+The rest of this report is organized as follows. 
+\autoref{ch:preliminaries} provides some preliminary knowledge in program logic and automatic verification. We also conduct a literature review on related work regarding higher order program verification. 
+\autoref{ch:design} describes the design of our prototype verification system.
+\autoref{ch:evaluation} presents some programming examples to further elaborate on the proposed verification rules.
+We conclude the entire report as well as discuss further directions for future research in \autoref{ch:concl}.

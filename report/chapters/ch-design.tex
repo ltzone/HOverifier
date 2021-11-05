@@ -1,0 +1,247 @@
+\SetPicSubDir{ch-Design}
+\SetExpSubDir{ch-Design}
+
+\chapter{Design of the system}
+\label{ch:design}
+\vspace{2em}
+
+
+\section{Programming Language}
+
+
+\begin{figure}[htp]
+$$\begin{array}{rrl}
+    \text{program}: & \texttt{P} := &\texttt{tdecl}^* \ \texttt{meth}^* \\
+    \text{type declaration}: & \texttt{tdecl} := & \texttt{datat} \mid \texttt{spred} \\
+    \text{data type}: & \texttt{datat} := & \texttt{type } \mathbf{c} \texttt{ = } \texttt{tconstr}^* \\
+    \text{shape predicate}: & \texttt{spred} := & \texttt{spname}\langle v^* \rangle = \Phi \texttt{ inv } \pi \\
+    \text{type constructor}: & \texttt{tconstr} := & \texttt{cname of } \tau^* \\
+    % TODO allow function types in an ADT?
+    \text{ground types}: &\tau := & \texttt{int} \mid \texttt{bool} \mid \texttt{float} \mid \texttt{unit} \mid \mathbf{c} \\  
+    \text{general types}: &\gamma := & \tau \mid \gamma_1 \rightarrow \gamma_2 \mid \Pi_{a}.\gamma \\  
+    \text{method definition} & \texttt{meth} := 
+       & \texttt{let f}: \gamma := e  \texttt{ where } \mathcal{F}  \\
+    \\
+    \text{function body} & e := & k^{\tau} \mid \lambda v.e \mid e_1 \ e_2 \\
+    & \mid & \texttt{if } e_0 \texttt{ then } e_1 \texttt{ else } e_2 \\
+    & \mid & \texttt{match } e \texttt{ with } (\texttt{cname} \Rightarrow e_i)^* \\
+    & \mid & \texttt{op } \vec{e}
+\end{array}$$
+    \caption{The core language}
+    \label{fig:LanAST}
+\end{figure}
+
+
+
+
+\section{Assertion Language}
+
+We require the shape predicate to be well-formed, that is, for all heap nodes $p::c\langle v^* \rangle$ occurring in the body, c is a data type name iff p = root.
+
+
+\begin{figure}[htp]
+$$\begin{array}{rrl}
+    \text{program variables}: & \texttt{v} :=        
+        & \texttt{x},\texttt{y},\texttt{f},\texttt{g},\ldots\\
+    \text{function specification}: & \mathcal{F} := 
+        & \texttt{f}(\vec{\texttt{x}}) \vDash \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}} \\
+    % &\mid& \texttt{f}(\vec{\texttt{x}}) \vDash \mathrm{fpure}(\vec{\mathtt{x}}) \\
+    \\
+    \text{logical variables}: & v := 
+        & a, b,c, \ldots \\
+    \text{Disjunctive normal form}: &\Phi := 
+        & \bigvee \left((\exists \vec{v}. \pi)\right)^{*} \wedge \vec{\mathcal{F}} \\
+    \text{pre/post condition} & \Delta := 
+        & \Phi \mid \exists v. \Delta \mid \Delta \wedge \pi \mid \Delta_1 \vee \Delta_2 \\
+    \\
+    \text{pure predicates}: & \pi := 
+        & s_1 = s_2 \mid s_1 \le s_2 \text{\quad (arithmetic judgements)} \\
+    &\mid& \pi_1 \wedge \pi_2 \mid \pi_1 \vee \pi_2 \mid \neg \pi \\
+    &\mid& \forall v. \pi \mid \exists v. \pi  \\
+    \text{logical expressions}: & s := 
+        & v \mid \mathrm{fpure}(\vec{s}) \mid c \\
+    &\mid& s_1 + s_2 \mid - s \mid \text{max}(s_1,s_2) \mid  \text{min}(s_1,s_2) 
+% TODO: equality over integers, can be extended to functions?
+\end{array}$$
+    \caption{The current specification language}
+    \label{fig:AssASTcur}
+\end{figure}
+
+
+\section{Forward Verification}
+
+
+\subsection{Logical reasoning rules}
+
+$\Sigma$: context of logical variables. $\Gamma$: context of specifications.
+
+\begin{figure}
+\centering
+\begin{mathpar}
+    \inferrule*[left=Fv-App, right=partial application]{
+            \Sigma;\Gamma \provable\hoareabbr{\Delta_0}{{f}}{\texttt{g}}{\Delta_1}
+        \and
+            \Sigma;\Gamma \provable\hoareabbr{\Delta_1}{{x}}{\texttt{v}}{\Delta_2}
+        \\
+            \texttt{g}(\texttt{a},{\mathtt{\vec{b}}}) \ofspec 
+                \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}} \in \Gamma \cup Spec(\Delta_2)
+        \\
+            \Delta_2 \entails             
+                \Phi_{\text{pre}}[\mathtt{v/a}] * \Delta_r
+        \and
+            \Phi_{\text{post}}[\mathtt{v/a,res/r}] * \Delta_r \entails \Delta_3
+    } {
+        \Sigma;\Gamma \provable\hoareabbr{\Delta_0}{f \ {x}}{h}{
+            \Delta_3 \wedge
+            \texttt{h}({\mathtt{\vec{x'}}}) \ofspec 
+                \Phi_{\text{pre}}[v/a] \rightarrowtail_{\mathtt{res} } \Phi_{\text{post}}[v/a,res/r]
+        }
+    }
+    \\
+        \inferrule*[left=Fv-App2, right=full application]{
+            \Sigma;\Gamma \provable\hoareabbr{\Delta_0}{{f}}{\texttt{g}}{\Delta_1}
+        \and
+            \Sigma;\Gamma \provable\hoareabbr{\Delta_1}{{x}}{\texttt{v}}{\Delta_2}
+        \\
+            \texttt{g}(\texttt{a}) \ofspec 
+                \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}} \in \Gamma \cup Spec(\Delta_2)
+        \\
+            \Delta_2 \entails             
+                \Phi_{\text{pre}}[\mathtt{v/a}]
+        \and
+            \Phi_{\text{post}}[\mathtt{v/a,res/r}] \entails \Delta_3
+    } {
+        \Sigma;\Gamma \provable\hoareabbr{\Delta_0}{f \ {x}}{res}{
+            \Delta_3
+        }
+    }
+    \\
+    \inferrule*[left=Fv-Extract-Spec]{
+        \Sigma;\Gamma,\mathcal{F} \provable\hoareabbr{ \Phi_{\text{pre}}}{c}{r}{ \Phi_{\text{post}}}
+    } {
+        \Sigma;\Gamma\provable\hoareabbr{\Delta_1\wedge\mathcal{F}}{c}{r}{\Delta_2}
+    }
+    \and
+    \inferrule*[left=Fv-Exists]{
+        \Sigma,x;\Gamma \provable\hoareabbr{\Delta_1}{c}{r}{\Delta_2}
+    } {
+        \Sigma;\Gamma\provable\hoareabbr{\exists x.\Delta_1}{c}{r}{\Delta_2}
+    }
+    \\
+    \inferrule*[left=Fv-Method]{
+        FLV(\mathcal{F});P,\mathcal{F}  \provable\hoareabbr{ \Phi_{\text{pre}}}{c}{r}{ \Phi_{\text{post}}}
+        \and
+        \mathcal{F} =  \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}}
+    } {
+        \provable\hoareabbr{\Delta_1}{\texttt{let f=}\lambda \vec{\mathtt{x}}.c \texttt{ where } \mathcal{F} }{}{\Delta_2}
+    }
+    \and
+    \inferrule*[left=Fv-Match]{
+        \hoareabbr{\Delta_1}{e}{v}{\Delta_2}
+        \and
+        \forall i,
+            \hoareabbr{\Delta_2  \wedge
+                        constr(v) = cname_i \wedge
+                        param(v) = \vec{x_i}}{e}{u}{\Delta_3}
+    } {
+        \Sigma; \Gamma \provable \hoareabbr{\Delta_1}{
+            \texttt{match } e \texttt{ with } (\texttt{cname}_i \Rightarrow \lambda \vec{x_i}.e_i)^*
+        }{res}{\Delta_3[res/u]}
+    }
+    \and
+    \inferrule*[left=Fv-If]{
+        \hoareabbr{\Delta_1}{e}{v}{\Delta_2}
+        \and
+        \hoareabbr{\Delta_2 \wedge v = true}{e_1}{res}{\Delta_3}
+        \and
+        \hoareabbr{\Delta_2 \wedge v = false}{e_2}{res}{\Delta_3}
+    } {
+        \Sigma; \Gamma \provable \hoareabbr{\Delta_1}{
+            \texttt{if } e \texttt{ then } e_1 \texttt{ else } e_2 \ 
+        }{res}{\Delta_3[res/u]}
+    }
+\end{mathpar}
+    \caption{Proof rules of Hoare logic}
+    \label{fig:choarelogic}
+\end{figure}
+
+Remarks:
+\begin{enumerate}
+    \item FV-app deals with partial application, which basically creates a new instance of specification for function type. TODO: We did not deal with the separation frame here.
+    
+    slightly different from the logic defined by yoshida, et al, which uses $m\cdot n=u\{C'\}$ to propagate the verification from an application to its abstraction.  We do the reverse. 
+\end{enumerate}
+
+
+TODO: propose a simple uncurried rule for verifying full application, and prove its correctness based on FV-app partial application rule.
+
+\subsection{Implementation}
+
+\autoref{Rice:algo:sample} demonstrates the formatting of pseudo code. 
+Please carefully check the source files and learn how to use this style. 
+Importantly:
+
+\begin{itemize}
+\item Always state your input.
+
+\item State the output if any. 
+
+\item Always number your lines for quick referral.
+
+\item Always declare and initialize your local variables. 
+
+\item Always use \CMD{\gets} (``$\gets$'') for assignments.
+%Always use \textbackslash gets for assignments.
+\end{itemize}
+
+\begin{algorithm}[!t]
+\AlgoFontSize
+\DontPrintSemicolon
+
+\KwGlobal{max. calories of daily intake $\mathcal{C}$}
+\KwGlobal{calories per bowl of rice $\mathcal{B}$}
+\BlankLine
+
+\SetKwFunction{fEatRice}{EatRice}
+\SetKwFunction{fDoExercise}{DoExercise}
+
+\KwIn{number of bowls of rice $n$}
+\KwOut{calories intake}
+\Proc{\fEatRice{$n$}}{
+  $cal \gets n \times \mathcal{B}$\;
+  \uIf{$cal \geq \mathcal{C}$}{
+    \Return $\mathcal{C}$\;
+  }
+  \Else{
+    \Return $cal - \fDoExercise{n}$\;
+  }
+}
+
+\BlankLine
+
+\KwIn{time duration (in minutes) of exercise $t$}
+\KwOut{calories consumed}
+\Func{\fDoExercise{$t$}}{
+  $cal \gets 0$\;
+  \lFor{$i \gets 1$ \To $t$}{$cal \gets cal + i$}
+  \Return $cal$\;
+}
+
+\caption{Sample pseudo code of a dummy algorithm.}
+\label{Rice:algo:sample}
+\end{algorithm}
+
+
+
+\section{Entailment checking}
+
+\subsection{Verification condition encoding}
+
+
+\subsection{Implementation}
+
+
+
+\section{The programming interface}
+
+Note that logical variables (other than program variables) that are used by both precondition and postcondition shall be marked as free variables, while those that are used in either precondition or postcondition alone, shall be existentially bound. 

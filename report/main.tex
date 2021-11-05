@@ -1,0 +1,55 @@
+%%% enable "DoubleSided" for paper-based submission, i.e. printing, and 
+%%% remove it for the final submission, i.e. electronic thesis
+\newcommand*{\DoubleSided}{} 
+
+\input{_global_settings.tex}
+
+\begin{document}
+
+\title{Automatic Verification of Higher Order Programs}
+
+\author{ZHOU Litao}
+\prevdegrees{%
+  Shanghai Jiao Tong University}
+\degree{NGNE CP3106 Personal Project}
+\field{Computer Science}
+\degreeyear{2021}
+\supervisor{Associate Professor CHIN Wei Ngan}
+
+% only involve the examiners in the final submission
+% \examiners{%
+%   Associate Professor CHAR Kway Teow \\
+%   Assistant Professor Yummy Bee Hoon CRAB \\
+%   Professor BAK Kwa, Dessert University}
+
+\maketitle
+
+% \declaredate{15 October 2019}
+% \declaresign{\RootPicDir /signature.jpg} % remove this if you prefer to sign physically
+% \declarationpage
+
+\begin{frontmatter}
+%   \dedicate{To my delicious friends}
+  \input{chapters/acknowledgments.tex}
+  \tableofcontents 
+  \input{chapters/abstract.tex}
+  \listoffigures
+  \listoftables
+\end{frontmatter}
+
+\input{chapters/ch-intro.tex}
+\input{chapters/ch-review.tex}
+\input{chapters/ch-rice.tex}
+\input{chapters/ch-noodle.tex}
+\input{chapters/ch-concl.tex}
+
+\bookmarksetup{startatroot}
+\printbibliography[heading=bibintoc]
+
+\appendix
+\input{chapters/ap-recipes.tex}
+\input{chapters/ap-ingredients.tex}
+
+\input{chapters/ap-publication.tex} % optional to include your publication list
+
+\end{document}

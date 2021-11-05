@@ -384,8 +384,12 @@ let open Parsetree in
 
       (* Step 2: unify post_conditions *)
       let unified_anchor = Env.get_fresh_res_name env in
-      let unified_anchor_ty = Env.lookup_vtype env bname_t in
-      let new_env = Env.add_vtype env unified_anchor unified_anchor_ty in
+      
+      let new_env = 
+                  try
+                    let unified_anchor_ty = Env.lookup_vtype env bname_t in
+                    Env.add_vtype env unified_anchor unified_anchor_ty
+                with _ -> env in
       let f_acc_t = subst_pred_normal_form bname_t unified_anchor f_acc_t in
       let f_acc_f = subst_pred_normal_form bname_f unified_anchor f_acc_f in
       [(new_env, unified_anchor, {pure= f_acc_t.pure @ f_acc_f.pure; spec=f_acc_t.spec @ f_acc_f.spec })] )))
@@ -431,8 +435,11 @@ let open Parsetree in
               infer_of_expression new_env inferred_cond pc_rhs |>
               List.map (fun (env', anchor', acc') ->
                 (* at least one solution, so we can complete the type information of unified anchor here *)
-                let unified_anchor_ty = Env.lookup_vtype env' anchor' in
-                let env' = Env.add_vtype env' last_anchor unified_anchor_ty in
+                  let env' = 
+                  try
+                    let unified_anchor_ty = Env.lookup_vtype env' anchor' in
+                    Env.add_vtype env' last_anchor unified_anchor_ty
+                with _ -> env' in
                 
                 let subst_acc = subst_pred_normal_form anchor' last_anchor acc' in
                 (env', last_anchor,
@@ -475,6 +482,9 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
 
     (if last_res then true else
     (let substed_post = subst_pred_normal_form (fst (fst spec.fpost)) post_anchor (snd spec.fpost) in
+
+    (* TODO: spec should also be substed if the return value is a function specification  *)
+
     let post_pure = ( substed_post.pure ) in
     let post_spec = ( substed_post.spec ) in
 
@@ -487,7 +497,9 @@ let infer_of_value_binding env (val_binding:Parsetree.value_binding)
     let check_post_spec (expect_spec:fun_signature) : bool = 
       (let exist_spec = Env.find_spec expect_spec.fname inferred_env in
       (match exist_spec with 
-      |  None -> failwith ("No spec exist for expected return spec named " ^ expect_spec.fname)
+      |  None -> 
+        print_endline (Env.all_specs env);
+        failwith ("No spec exist for expected return spec named " ^ expect_spec.fname)
       | Some exist_spec ->
           (let valid_exist_spec = List.filter 
               (fun spec -> match Sleek.check_spec_sub inferred_env inferred_post_pure expect_spec spec with

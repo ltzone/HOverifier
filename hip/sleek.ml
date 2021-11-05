@@ -126,6 +126,8 @@ let rec expr_to_expr env exp : Expr.expr =
   | Minus -> Arithmetic.mk_sub ctx [t1_expr ; t2_expr ]
   | Mult -> Arithmetic.mk_mul ctx [t1_expr ; t2_expr ]
   | Eqb -> Boolean.mk_eq ctx t1_expr t2_expr
+  | Leb -> Arithmetic.mk_le ctx t1_expr t2_expr
+  | Ltb -> Arithmetic.mk_lt ctx t1_expr t2_expr
 
 let rec pure_pred_to_expr env pred : Expr.expr =
   let ctx = env.ctx in

@@ -48,6 +48,26 @@ let eq_sig = {
   ]; spec=[]};
 }
 
+let le_sig = {
+  fname="<=";
+  fvar=["p1", Int ; "p2", Int ];
+  pnames=[];
+  fpre={pure=[[], (True)]; spec=[]};
+  fpost=("r", Bool), {pure=[ [],
+    (Arith (Eq, Pvar "r",  Op (Leb, Pvar "p1", Pvar "p2")));
+  ]; spec=[]};
+}
+
+
+let lt_sig = {
+  fname="<";
+  fvar=["p1", Int ; "p2", Int ];
+  pnames=[];
+  fpre={pure=[[], (True)]; spec=[]};
+  fpost=("r", Bool), {pure=[ [],
+    (Arith (Eq, Pvar "r",  Op (Ltb, Pvar "p1", Pvar "p2")));
+  ]; spec=[]};
+}
 
 let minus_sig = {
   fname="-";
@@ -69,10 +89,14 @@ let mult_sig = {
   ]; spec=[]};
 }
 
+
+
 let sigs = [
   mult_sig;
   minus_sig;
   eq_sig;
+  lt_sig;
+  le_sig;
   div_op_sig;
   plus_sig; (* TODO: library *)
 ]

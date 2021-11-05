@@ -11,7 +11,7 @@ type program_var = string
 type constant = Int of int 
 | Bool of bool
 
-type bin_operator = Plus | Minus | Mult | Eqb
+type bin_operator = Plus | Minus | Mult | Eqb | Leb | Ltb
 
 type logical_exp = Pvar of program_var 
 | Lvar of logical_var 
@@ -100,7 +100,7 @@ let rec logical_exp_to_string = function
 | Const (Int i) -> string_of_int i
 | Const (Bool i) -> string_of_bool i
 | Op (oper, t1, t2) ->
-    let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" | Eqb -> "==" in
+    let op_str = match oper with | Plus -> "+" | Minus -> "-" | Mult -> "*" | Eqb -> "=b" | Leb -> "<=b" | Ltb -> "<b" in
     String.concat "" ["("; logical_exp_to_string t1; op_str; logical_exp_to_string t2; ")"]
 
 

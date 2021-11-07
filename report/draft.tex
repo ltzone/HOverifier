@@ -1,0 +1,69 @@
+
+\autoref{Rice:algo:sample} demonstrates the formatting of pseudo code. 
+Please carefully check the source files and learn how to use this style. 
+Importantly:
+
+\begin{itemize}
+\item Always state your input.
+
+\item State the output if any. 
+
+\item Always number your lines for quick referral.
+
+\item Always declare and initialize your local variables. 
+
+\item Always use \CMD{\gets} (``$\gets$'') for assignments.
+%Always use \textbackslash gets for assignments.
+\end{itemize}
+
+\begin{algorithm}[!t]
+\AlgoFontSize
+\DontPrintSemicolon
+
+\KwGlobal{max. calories of daily intake $\mathcal{C}$}
+\KwGlobal{calories per bowl of rice $\mathcal{B}$}
+\BlankLine
+
+\SetKwFunction{fInferExp}{InferExp}
+\SetKwFunction{fDoExercise}{DoExercise}
+
+\KwIn{Proof context $\mathcal{E}=(\Sigma,\Gamma)$, program expression $e$ and pre-condition $\Delta$}
+\KwOut{A set of (context, return name, post-condition) $\left\{ \mathcal{E'},\mathtt{r},\Delta' \right\}$}
+\Proc{\fInferExp{$\mathcal{E},e,\Delta$}}{
+  Apply \nameref{rule:fv-exists} and \nameref{rule:fv-spec} to normalize $\Delta$ and update $\mathcal{E}$\;
+  \Switch{the structure of $e$}{
+     \uCase{identifier $v$}{ 
+        Apply \nameref{rule:fv-var}, \nameref{rule:fv-fun-eval} if applicable and get $\mathcal{E}', \mathtt{res}, \Delta'$\;
+        \Return{ $\left\{ (\mathcal{E}'(\leftarrow\mathtt{res}), \mathtt{res}, \Delta') \right\}$  }\;
+     }
+     \uCase{constant $k$}{ \Return{ $\left\{ (\mathcal{E}', \mathtt{res}, \Delta') \right\}$} obtained by \nameref{rule:fv-cst} }
+     \Case{last value}{
+        do this\;
+        break\; 
+    }
+     \Other{
+       for the other values\;
+       do that\;
+    } 
+  }
+  \uIf{$cal \geq \mathcal{C}$}{
+    \Return $\mathcal{C}$\;
+  }
+  \Else{
+    \Return $cal - \fDoExercise{n}$\;
+  }
+}
+
+\BlankLine
+
+\KwIn{time duration (in minutes) of exercise $t$}
+\KwOut{calories consumed}
+\Func{\fDoExercise{$t$}}{
+  apply \ref{rule:fv-exists} \;
+  \lFor{$i \gets 1$ \To $t$}{$cal \gets cal + i$}
+  \Return $cal$\;
+}
+
+\caption{Forward verification implementation}
+\label{Rice:algo:sample}
+\end{algorithm}

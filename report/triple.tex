@@ -1,10 +1,35 @@
-\usepackage{mathpartir}
+\usepackage{mathpartir,xparse}
 % \usepackage{tgschola}
 \usepackage{amsmath}
 \usepackage{amsthm}
 \usepackage{amssymb}
 \usepackage{listings}
 % \lstset{columns=fullflexible}
+\usepackage{nameref}
+
+
+% infer rules cross reference
+\makeatletter
+\let\originferrule\inferrule
+\DeclareDocumentCommand \inferrule { s O {} m m o }{%
+  \IfBooleanTF{#1}%
+  {%
+    \mpr@inferstar[#2]{#3}{#4}%
+  }{%
+    \mpr@inferrule[#2]{#3}{#4}%
+  }%
+  \IfValueT{#5}%
+  {%
+    % \quad
+    % #5%
+    \my@name@inferrule{#2}%
+  }%
+}
+\NewDocumentCommand \my@name@inferrule { m }{%
+  \def\@currentlabelname{[\textsc{#1}]}%
+}
+\makeatother
+
 
 % Custom notations
 \newcommand{\figref}[1]{Fig.~\ref{#1}}
@@ -56,3 +81,4 @@
 
 \newcommand{\atomstmt}{\text{atom\_stmt}}
 \newcommand{\stmt}{\text{stmt}}
+

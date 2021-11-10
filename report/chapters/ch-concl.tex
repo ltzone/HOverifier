@@ -3,29 +3,28 @@
 
 \section{Research process}
 
+This report is a summary of work starting from the late September of 2021. Before that, I took some time to read literature about automatic verification of higher order functions and to get familiar with the HIP/SLEEK system. Then I began proposing a simple solution to verify some higher order programs presented in \autoref{ch:evaluation}. The proof rules in \autoref{ch:design} were also driven by these examples. As I gradually enriched the logical system, I also implemented these rules into an OCaml prototype system.
 
 \section{Evaluation}
 
 The solution provided in this report is mainly trying to tackle automatic verification for higher order programs. The impact of this work can be summarised into following main points.
 
 \begin{enumerate}
-    \item solution...
+    \item We proposed a logical system that can verify programs with higher order functions, which made use of abstract predicates and assertions with specifications as a solution.
+    \item We implemented a prototype system including a forward verifier and entailment checker.
+    \item We present some examples to demonstrate some practical use cases for verifying higher order functions.
 \end{enumerate}
-
-
-\section{Limitation}
 
 \section{Future Research Directions}
 
+Due to the limit of time, the current system is preliminary, but based on our framework, there are a few directions that can be explored to make our system more useful.
 
-\subsection{Prove soundness of the system}
-
-
-\subsection{Extend the logic}
-
-% to support mutable variables
-
-\subsection{More powerful entailment checker}
+\paragraph{Prove soundness of the system} We have not formally proved the soundness of our logical system. Our specification language makes it convenient for the logical system to perform forward verification. However, our definition of assertions may pose a challenge to model the semantics of the program and prove soundness. Therefore one future direction is to prove the soundness of our system to make our system more reliable.
 
 
-We believe the above (but not limited to) future research directions will advance the technology presented in this thesis and contribute to academia and industry.
+\paragraph{Extend the logical system} Currently our logical system only allows users to write pure predicates to characterize pure programs that do not have any side effects. However, modern functional languages also support mutable variables to improve efficiency. One particular benefit of using Hoare logic to verify programs is that it can be extended to separation logic~\cite{Reynolds2002} which provides a modular solution to verify programs with heap states. Our system has the potential to integrate with the HIP/SLEEK system and verify more program strictures.
+
+\paragraph{More powerful instance inference} One limit of our current system is that the power of automated verification is constrained by its ability to infer instances when a higher order function is called. Currently our system largely relies on user's manual effort to provide appropriate concrete predicates to proceed the proof. However, we also observe that many instances are naive and should be automatically inferred. Introducing more powerful inference techniques will greatly improve the practical value of our system.
+
+
+We believe the above (but not limited to) future research directions will advance the higher order program verification techniques presented in this report.

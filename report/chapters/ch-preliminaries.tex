@@ -7,7 +7,44 @@
 
 \section{Higher order programs}
 
-\section{Hoare logic based reasoning}
+Programs with higher order functions either take other functions as input or return other functions as output (or both). Higher order programs are useful in that programmers can write general, reusable code with higher order functions. Consider a famous higher order function \texttt{fold} that combines elements of a list in \autoref{code:intro}.
 
-\section{Refinement type based reasoning}
+\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Higher order function that combines list elements, label=code:intro]
+let rec fold_left op acc = function
+  | []   -> acc
+  | h :: t -> fold_left op (op acc h) t
+\end{lstlisting}
 
+To illustrate, \texttt{fold\_left f a [b;c;d]} computes the expression
+\texttt{f(f(f(a,b),c),d)}. The behavior of \texttt{fold\_left} is to 
+fold elements of the list from left to the right and combine the next
+element using the operator \texttt{op}. Since \texttt{op} is a 
+function as parameter, the \texttt{fold\_left} function is a higher
+order function.
+
+We can use the \texttt{fold\_left} function to implement many useful functions, as shown in \autoref{code:intro2}. It is expected that modern verification tools should be able to specify and verify such programs.
+
+\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=\texttt{fold\_left} application examples, label=code:intro2]
+let length l = List.fold_left (fun a _ -> a+1) 0 l
+let sum l = List.fold_left (fun a b -> a+b) 0 l
+let rev l = List.fold_left (fun a x -> x::a) [] l
+\end{lstlisting}
+
+
+
+\section{Refinement type based reasoning} One related work in specifying and verifying higher order functional programs is the LiquidHaskell project~\cite{Rondon2008LiquidTypes}. LiquidHaskell is a static verifier for Haskell, based on refinement types~\cite{Vazou2014LiquidHaskell}. The precondition and postconditions can be encoded using refined function types like 
+$$
+\begin{array}{l}
+\texttt{type Pos = \{v:Int | v > 0 \} } \\
+\texttt{type Nat = \{v:Int | v >= 0\} } \\
+\texttt{div:: n:Nat -> d:Pos -> \{v:Nat | v <= n\}}
+\end{array}
+$$ 
+which states that the function \texttt{div} requires inputs that are respectively non-negative and positive, and ensures that the output is no greater than the first input n. 
+
+LiquidHaskell has a type checker that applies SMT to check the validity of the refinement type specifications. The system has been shown its effectiveness in verifying program safety properties, and data structures~\cite{Kawaguchi2009LHDS}. One important feature of LiquidHaskell is that its restriction on refinements has been delicately designed to be decidable in type checking while expressive enough to specify program properties. Our project differs from LiquidHaskell in that we choose not to specify properties with refinement type, but allow a more flexible assertion syntax in the style of Hoare logic.
+
+
+\section{Hoare logic based reasoning} Hoare logic~\cite{Hoare1969} has long been a natural way of writing down specifications of programs. The main judgement of Hoare logic consists of a program and a pair of formulae \texttt{\{P\}c\{Q\}}, indicating if program state satisfies property \texttt{P}, then after executing program \texttt{c}, the program state should satisfy \texttt{Q}. 
+
+Yoshida et al.~\cite{Yoshida2008} proposed an extension of Hoare logic for call-by-value higher-order functions with ML-like local reference generation, and proved the logic sound with respect to a standard semantic model. However, the design of their assertion language and the rules of their logical system are difficult to automate reasoning.

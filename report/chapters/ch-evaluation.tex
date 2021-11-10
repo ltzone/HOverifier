@@ -47,7 +47,7 @@ Next, we demonstrate how the specification we have verified for \texttt{twice} i
 
 Note that our system has already integrated some basic specifications for library functions such as \texttt{(+)}, which can be considered as an infix syntatic sugar for a function that takes two inputs. Therefore, the specification for \texttt{incr} is easy to verify.
 
-The verification of \texttt{incr\_twice} can be simply done by applying \nameref{rule:fv-app-full}. Note that the specification for \texttt{twice} has an abstract predicate \texttt{fpure}, so we should instantiate it as \texttt{fpure(x,res) |= res = x + 1} to make the verification succeed. The inference of instantiating is expected to be automatically done based on the existing specification of \texttt{incr}. However, to simplify the implementation, our current system requires user to manually provide the instance when an abstract predicate should be instantiated.
+The verification of \texttt{incr\_twice} can be simply done by applying \nameref{rule:fv-app-full}. Note that the specification for \texttt{twice} has an abstract predicate \texttt{fpure}, so we should instantiate it as \texttt{fpure(x,res) |= res = x + 1} to make the verification succeed. The inference of instantiating is expected to be automatically done based on the existing specification of \texttt{incr}. However, to simplify the implementation, our current system requires users to manually provide the instance when an abstract predicate should be instantiated.
 
 \begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Higher order twice function application, label=code:incr_twice]
 let incr x = x + 1
@@ -61,7 +61,7 @@ let incr_twice x2 = twice incr x2
  ensures[r]  { r = x2 + 2 } @*)
 \end{lstlisting}
 
-In the verification of \texttt{incr\_twice}, there are two invocations to the entailment checker. The first call takes place when using the \nameref{rule:fv-app-full}. We need to check the derivation from the precondition of \texttt{incr\_twice} to the precondition of \texttt{twice}, which involves the checking of both the pure predicate part and the specification part. The pure part is trivial, and the specification part is also straightforward since specification for argument \texttt{f} instantiated with \texttt{fpure(x,res) |= res = x + 1} is almost the same as the specification of \texttt{incr}, so the subsumption relation holds.
+In the verification of \texttt{incr\_twice}, there are two invocations to the entailment checker. The first call takes place when applying \nameref{rule:fv-app-full}. We need to check the derivation from the precondition of \texttt{incr\_twice} to the precondition of \texttt{twice}, which involves the checking of both the pure predicate part and the specification part. The pure part is trivial, and the specification part is also straightforward since specification for argument \texttt{f} instantiated with \texttt{fpure(x,res) |= res = x + 1} is almost the same as the specification of \texttt{incr}, so the subsumption relation holds.
 
 
 \section{Function as return values}
@@ -100,9 +100,7 @@ ensures  [r]{ 4 * r = x } @*)
 
 \section{Recursive predicates}
 
-Note fibP is not given here.
-
-\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, title=Use inductive predicates to specify recursive function]
+\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Use recursive predicate to verify Fibonacci, label=code:fib ]
 let rec fib n =
   if n = 0 then 1 else
     if n = 1 then 1 else 
@@ -112,17 +110,56 @@ let rec fib n =
 requires { 0<=n }
 ensures[res] { fibP(n,res) }
 
-pred fibP(q1:int,q2:int) |=
-    q1 = 0 & q2 = 1 or  q1 = 1 & q2 = 1
-or  EX (r1:int) (r2:int), q2 = r1 + r2 
-      & fibP(q1 - 1,r1) & fibP(q1 - 2,r2) @*)
+pred fibP(x:int,r:int) |=
+    x = 0 & r = 1 or  x = 1 & r = 1
+or  EX (r1:int) (r2:int), r = r1 + r2 
+      & fibP(x - 1,r1) & fibP(x - 2,r2) @*)
 \end{lstlisting}
+
+As has been shown in the practice of the HIP/SLEEK system~\cite{Chin2012HipSleek},
+user-definable predicates allow programmers to describe a wide range of 
+functions and data structures with their associated shape, size and 
+bag (multi-set) properties.
+To improve the expressiveness of our specification language, we also extend the our
+system to support reasoning on inductive predicates, so that behavior of
+recursive functions can be captured in the assertions.
+
+A simple recursive function for computing Fibonacci is shown in \ref{code:fib}.
+To define what the \texttt{x}-th entry of a Fibonacci sequence is,
+we define an inductive predicate \texttt{fibP}, where 
+the predicate name \texttt{fibP} itself can appear in the third constructor body.
+With \texttt{fibP} defined, we can specify the function \texttt{fib} simply by
+using the \texttt{fibP} in the postcondition to describe the relation
+between the output \texttt{res} and the input \texttt{n}. Note that we do not
+write \texttt{fibP} in the given clause, since unlike previous examples
+with abstract predicates, \texttt{fibP} here is a concrete predicate.
+
+After the forward verification, the entailment checker is asked to verify the following condition
+$$
+\begin{array}{l}
+\texttt{ n >= 0 \& n = 0 \& res = 1} \\
+\texttt{| n >= 0 \& n != 0 \& n = 1 \& res = 1} \\
+\texttt{| n >= 0 \& n != 0 \& n != 1 \& fibP(n-1, res1) \&} \\
+\texttt{\quad fibP(n-1, res2) \& res = res1 + res2} \\
+\Rightarrow \texttt{\ fibP(n, res)}
+\end{array}
+$$
+
+This can be done by folding the LHS of the formula. In our implementation, we leave the predicate name \texttt{fibP} as an uninterpreted function in SMT solver. We also encode the definition of \texttt{fibP} as another constraint to the solver, so that the solver can make use of the folding rule to verify the above condition.
+
 
 
 
 \section{Verify functions on variant types}
 
-\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, title=Use inductive predicates to specify functions on variant types]
+One common use case of higher order function often comes with certain data structures, so that operations on data structures can be abstracted, allowing programmers to write modular programs.
+In functional programs, data structures are typically implemented as variant datatypes. \autoref{code:list} presents an example of the list data structure.
+Our system supports verification of variant types by allowing users to write
+user-definable predicates about data structures. We begin our example with a
+first order function calculating the length of a list.
+
+
+\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Use inductive predicates to specify functions on variant types, label=code:list]
 type list = Nil
           | Cons of (int * list)
 
@@ -140,36 +177,55 @@ let rec length lst =
 \end{lstlisting}
 
 
+The predicte \texttt{LL} is a binary relation on a list \texttt{lst} and its length \texttt{n}. It is inductively defined as follows: the length should be 0 on an empty list and if \texttt{LL(n-1,q)} holds, then appending a node before \texttt{q} can derive that the length of the new list is \texttt{n}. With \texttt{LL} defined, we can specify \texttt{length} that if we have a \texttt{n} such that the input \texttt{lst} satisfies \texttt{LL(n,lst)}, i.e. \texttt{n} is the length of \texttt{lst}, the return value \texttt{res} will be exactly the same as \texttt{n}.
 
-\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, title=Use inductive predicates to specify functions on variant types]
-(*@ pred LL_foldl(x,r,ys:list,fpure:int->int->int->bool)
+According to the \nameref{rule:fv-match} rule, the pattern-matching will create two disjunctive clauses during forward verification. The verifier can use the constraint introduced by pattern matching to determine which clause is used in the \texttt{LL} predicate. The \texttt{Nil} case is easy to verify. The \texttt{Cons} case has a recursive call to \texttt{length}. We can instantiate the specification with \texttt{n-1}, and apply \nameref{rule:fv-app-full} to get the inferred postcondition as follows, which is straight forward to derive the expected postcondition \texttt{res = n}.
+
+$$
+\begin{array}{l}
+\texttt{ lst::Nil<> \& n = 0 } \\
+\texttt{| lst::Cons<x,xs> \& LL(n-1,xs) \& r'=n-1 \& res = 1 + r'}
+\end{array}
+$$
+
+Our system can also be used to verify higher-order functions that operate on variant datatypes. The key is integrate abstract predicates that describes function parameter behavior into the inductive predicates that characterizes properties on data structures.
+
+Consider verifying the \texttt{fold\_left} function in \autoref{code:fold}, which takes a function argument \texttt{f} on two integers, and outputs the result of repeatedly applying \texttt{f} to the list \texttt{ys}, where each application uses the last computed result and updates the first argument applied to \texttt{f}.
+We can define a predicate \texttt{LL\_foldl} to reflect the behavior of this function. The predicate has four arguments, namely \texttt{x}, \texttt{ys}, and \texttt{fpure} as the input and \texttt{r} as the result. If \texttt{ys} is empty, then the result is equal to the input \texttt{x}. If the \texttt{ys} is a list node of value \texttt{y} and successor list \texttt{ys'}, there should exist an intermediate result value \texttt{z}, such that \texttt{z} is the result of \texttt{f(x,y)} and we can use \texttt{z} as the initial value to fold the rest of the list \texttt{ys'}.
+
+\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Use inductive predicates to specify functions on variant types, label=code:fold]
+(*@ pred LL_foldl(x,r,ys:list,fpure:int->int->int)
 |= ys::Nil<> & x=r
-or EX (ys':list) (y:int), ys::Cons<y,ys'> & 
-       LL_foldl(z,r,ys',fpure) & fpure(x,y,z)  @*)
+or EX (ys':list) (y:int) (z:int), ys::Cons<y,ys'> & 
+       LL_foldl(z,r,ys',fpure) & fpure(x,y) = z  @*)
 
 let rec fold_left f x ys = 
 (*@ declare fold_left(f:int->int->int,x:int,ys:list)
-given         fpure(int,int,int), (r:int)
+given         (fpure(int,int):int), (r:int)
 requires      { LL_foldl(x,r,ys,fpure) 
-                   with f(x,y) |= {true} *->:r {fpure(x,y,r)} }
+                   with f(x,y) |= {true} *->:r {r = fpure(x,y)} }
 ensures[res]  { res = r } @*)
 match ys with
 | Nil -> x
 | Cons (y, ys') -> fold_left f (f x y) ys'
+\end{lstlisting}
 
+We make use of the user-definable predicate \texttt{LL\_foldl} to specify \texttt{fold\_left}. Note that \texttt{LL\_foldl} takes an abstract predicate \texttt{fpure}, so we also need to specify that \texttt{fpure} reflects the behavior of the input function \texttt{f} in the precondition. 
+
+The \texttt{Nil} case is straightforward to verify. For the \texttt{Cons} branch, the specification of \texttt{f} first gives an intermediate result \texttt{r'=fpure(x,y)}. Unfolding \texttt{LL\_foldl} gives an existantial variable \texttt{z = fpure(x,y)}. By the congruence rule of uninterpreted function, we can ensure \texttt{r' = z}.  Next, at the recursive call site of \texttt{fold\_left}, we can instantiate the \texttt{fold\_length} specification with \texttt{r:=z} and get \texttt{res = r}, which completes the verification.
+
+
+\begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Application of \texttt{fold\_left}, label=code:fold_length]
 let fold_length x y = x + 1
 (*@ declare fold_length(x,y)
    requires      { true }
    ensures[res]  { res=x+1 } @*)
 
-
 let length xs = fold_left fold_length 0 xs
 (*@ declare length(xs:list)
    given (n:int)
-   requires      { LL<n,xs> }
+   requires      { LL(n,xs) }
    ensures[res]  { res=n } @*)
 \end{lstlisting}
 
-
-
-
+The specification of higher order function \texttt{fold\_left} can now be applied to verify more concrete instances. Consider another \texttt{length} implementation using the \texttt{fold\_left} function in \autoref{code:fold_length}. We can instantiate the \texttt{fold\_left} specification with \texttt{fpure(x,y)=x+1} and \texttt{r=n} to apply rule \nameref{rule:fv-app-full}. The enatilment checker is asked to verify that $\texttt{ LL(n,xs)} \Rightarrow \texttt{ LL\_foldl(0,n,xs,fpure(x,y)=x+1)} $. The entailment check can be done by induction on the structure of inductive predicates \texttt{LL} and \texttt{LL\_foldl}. We can encode the verification condition to the SLEEK solver to deal with such kind of proof. We leave the integration of SLEEK into our system as future work.

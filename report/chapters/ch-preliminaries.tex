@@ -7,7 +7,7 @@
 
 \section{Higher order programs}
 
-Programs with higher order functions either take other functions as input or return other functions as output (or both). Higher order programs are useful in that programmers can write general, reusable code with higher order functions. Consider a famous higher order function \texttt{fold} that combines elements of a list in \autoref{code:intro}.
+Programs with higher order functions either take other functions as input or return functions as output (or both). Higher order programs are useful in that programmers can write general, reusable code with higher order functions. Consider a famous higher order function \texttt{fold} that combines elements of a list in \autoref{code:intro}.
 
 \begin{lstlisting}[language=Caml, mathescape=true, xleftmargin=2em, aboveskip=1em, xrightmargin=1em, numbers=left, frame = {TB}, caption=Higher order function that combines list elements, label=code:intro]
 let rec fold_left op acc = function

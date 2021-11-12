@@ -11,8 +11,8 @@
 We provide a simple functional language in \autoref{fig:LanAST}. A program
 comprises a list of abstract datatype declarations \texttt{datat}, a list of user-defined predicates \texttt{spred} and a list of method declarations
 \texttt{meth}. The supscript $*$ is used to denote a list of items. The function
-body can be composed by constant $k^{\tau}$ of a ground type $\tau$, a variable $v$ bound by a function abstraction, 
-function application, if branches, pattern matching on datatype
+body can be composed by constant $k^{\tau}$ of a ground type $\tau$, a variable $v$, a lambda expression $e$ with a bounded variable $v$, 
+function application of two expressions, if branches, pattern matching on datatype
 expressions, and primitive operations (such as arithmetic and boolean operations).
 
 Following the OCaml programming convention, a program is presented as a 
@@ -72,14 +72,14 @@ such as conjunction and negation.
 As for the logical expressions, apart from basic operators and values from
 the arithmetic and boolean theory, we also allow logical expressions of the form
 $f(\vec{x})$, where $f$ is the name of a logical predicate bound
-by the \textrm{Given} clause. We will see the use of such \emph{abstract predicates}
+by the \textsc{given} clause. We will see the use of such \emph{abstract predicates}
 through examples in the next chapter.
 
 The function specification is composed of several parts, namely, function name
-$\texttt{f}$, function argument names $\vec{\texttt{x}}$, given variables $\vec{y}$, pre-condition $\Phi_{\text{pre}}$, the name of the return value (\emph{anchor}) $\texttt{r}$ and post-condition $\Phi_{\text{post}}$. Note that function specifications can also appear as sub-expressions in the precondition and postcondition. We require each top-level function specification to be 
+$\texttt{f}$, function argument names $\vec{\texttt{x}}$, \textsc{given} variables $\vec{y}$, (which serve as universally quantified auxiliary variables that only appear in specifications), precondition $\Phi_{\text{pre}}$, the name of the return value (\emph{anchor}) $\texttt{r}$ and postcondition $\Phi_{\text{post}}$. Note that function specifications can also appear as sub-expressions in the precondition and postcondition. We require each top-level function specification to be 
 well-formed, i.e. all the variables in the assertion should be closed as a
 program variable introduced by the function arguments, or a
-logical variable introduced by the given binder or existential quantifiers. The return value name can only occur in the postcondition.
+logical variable introduced by the \textsc{given} binder or existential quantifiers. The return value name can only occur in the postcondition.
 
 
 \begin{figure}[htp]
@@ -119,7 +119,7 @@ $$\begin{array}{rrl}
 
 We developed a prototype system in programming language OCaml to implement the automated verification. To make our system useful, we also provide our system with a front-end parser so that users can directly input a real-world OCaml program and write the specification they want to verify in the form of comments along with the code. As we shall see in the next chapter, all example codes can be directly input to the system and our system can report whether each function in the program is verified correct. The general structure of our system is shown in \autoref{fig:structure}.
 
-After parsing the program and user-provided specification, our system next
+After parsing the program and user-provided specification, our system
 implements a standard Hoare-style forward verifier, which will next invoke
 the entailment prover. The forward verifier is built upon a set of forward
 verification rules to systematically check the precondition is satisfied at
@@ -128,7 +128,7 @@ under the given precondition for each method declaration. At certain points,
 the verifier requires checking the entailment between two assertions holds, 
 which will be handled by the backend entailment prover. The benefit of 
 such structure is that our system can be modular and easily extended 
-to support richer features. In the next two sections, we will present in 
+to support richer features. In the next two sections, we will show in 
 detail how the forward verifier and entailment checker are designed
 and implemented.
 
@@ -141,7 +141,7 @@ and implemented.
 
 \subsection{Front-end Implementation}
 
-We present the implementation of our front-end parser in this section. This section also serves as a guide to use our system. Our system takes an OCaml program \texttt{*.ml} as input. Users should program each method in the format of \texttt{let f x = ...} and only use the structures supported by our system. Otherwise the forward verifier will reject the input. The codes enclosed by \texttt{(*...*)} will be recognized as comments. However, if users write comments enclosed by \texttt{(*@ ...@*)}, they will be recognized by our specification parser and the system will parse the user-defined specification into an abstract syntax tree for the forward verifier to use. Readers can refer to the next chapter to see several example programs that our system can accept and verify. Several implementation details are discussed below.
+We present the implementation of our front-end parser in this section. This section also serves as a guide to use our system. Our system takes an OCaml program \texttt{*.ml} as input. Users should program each method in the format of \texttt{let f x = ...} and only use the structures supported by our system. Otherwise the forward verifier will reject the input. The codes enclosed by \texttt{(*...*)} will be recognized as comments. However, if users write comments enclosed by \texttt{(*@ ...@*)}, they will be recognized by our specification parser and parsed into an abstract syntax tree for the forward verifier to use. Readers can refer to the next chapter to see several example programs that our system can accept and verify. Several implementation details are discussed below.
 
 \paragraph{OCaml frontend} We make use of the OCaml 4.12.0 frontend library to parse the program part, so our forward verifier is based on the same program abstract syntax tree as the OCaml compiler accepts. The detail of the AST definition can be found in the OCaml compiler repository\footnote{https://github.com/ocaml/ocaml/blob/4.12/parsing/parsetree.mli}.
 
@@ -157,29 +157,29 @@ The nested specifications in program assertions can be written as $\texttt{f(x)|
 \subsection{Logical reasoning rules}
 
 We present a rule-based declaration for our forward verification system in \autoref{fig:choarelogic}. 
-The judgement $\Sigma;\Gamma \provable \hoareabbr{\Delta_1}{e}{\texttt{r}}{\Delta_2}$ indicates \emph{if we evaluate $e$ in the initial state satisfying $\Delta_1$, then it terminates with a value, name it \texttt{r}, and a final state, which together satisfy $\Delta_2$}. All the rules are presented in a forward style, i.e. they expect precondition to be given before computing the postcondition. 
+The judgement $\Sigma;\Gamma \provable \hoareabbr{\Delta_1}{e}{\texttt{r}}{\Delta_2}$ indicates \emph{if we evaluate $e$ in the initial state satisfying $\Delta_1$, then it terminates with a value, name it \texttt{r}, and a final state, which together satisfy $\Delta_2$}. All the rules are presented in a forward style, i.e. they expect precondition to be given before computing the postcondition. We write $\Delta[\mathtt{b/a}]$ to indicate the assertion obtained from replacing \texttt{a} by \texttt{b} in $\Delta$. We assume all the introduced anchors and variables are fresh.
 
 \begin{figure}
 \centering
 \begin{mathpar}
     \inferrule[Fv-Method]{
-        \vec{x},\vec{y};P,\mathcal{F}  \provable\hoareabbr{ \Phi_{\text{pre}}}{c}{r}{ \Phi_{\text{post}}}
-        \and
         \mathcal{F} =  \textrm{Given } \vec{y}, \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}}
+        \and
+        \vec{x},\vec{y};P \provable\hoareabbr{ \Phi_{\text{pre}}}{e}{r}{ \Phi_{\text{post}}}
     } {
         \provable{\texttt{let f=}\lambda \vec{\mathtt{x}}.c \texttt{ where } \mathcal{F} }
     }[]\label{rule:fv-method}
     \\
     \inferrule[Fv-Spec]{
-        \Sigma;\Gamma,\mathcal{F} \provable\hoareabbr{ \Delta_1}{c}{r}{ \Delta_2}
+        \Sigma;\Gamma,\mathcal{F} \provable\hoareabbr{ \Delta_1}{e}{r}{ \Delta_2}
     } {
-        \Sigma;\Gamma\provable\hoareabbr{\Delta_1\wedge\mathcal{F}}{c}{r}{\Delta_2}
+        \Sigma;\Gamma\provable\hoareabbr{\Delta_1\wedge\mathcal{F}}{e}{r}{\Delta_2}
     }[]\label{rule:fv-spec}
     \and
     \inferrule[Fv-Exists]{
-        \Sigma,x;\Gamma \provable\hoareabbr{\Delta_1}{c}{r}{\Delta_2}
+        \Sigma,x;\Gamma \provable\hoareabbr{\Delta_1}{e}{r}{\Delta_2}
     } {
-        \Sigma;\Gamma\provable\hoareabbr{\exists x.\Delta_1}{c}{r}{\Delta_2}
+        \Sigma;\Gamma\provable\hoareabbr{\exists x.\Delta_1}{e}{r}{\Delta_2}
     }[]\label{rule:fv-exists}
     \\
     \inferrule[Fv-App-Par]{
@@ -188,11 +188,11 @@ The judgement $\Sigma;\Gamma \provable \hoareabbr{\Delta_1}{e}{\texttt{r}}{\Delt
             \Sigma,\texttt{g};\Gamma \provable\hoareabbr{\Delta_1}{{x}}{\texttt{v}}{\Delta_2}
         \and
             \texttt{g}(\texttt{a},{\mathtt{\vec{b}}}) \ofspec 
-                \mathcal{F}
+                \mathcal{F} \in \Gamma
     } {
         \Sigma;\Gamma \provable\hoareabbr{\Delta_0}{f \ {x}}{h}{
             \Delta_2 \wedge
-            \texttt{h}({\mathtt{\vec{x'}}}) \ofspec \mathcal{F}[\mathtt{v/a}]
+            \texttt{h}({\mathtt{\vec{b}}}) \ofspec \mathcal{F}[\mathtt{v/a}]
         }
     }[]\label{rule:fv-app-par}
     \\
@@ -248,7 +248,7 @@ The judgement $\Sigma;\Gamma \provable \hoareabbr{\Delta_1}{e}{\texttt{r}}{\Delt
     \inferrule[Fv-Var]{
       \texttt{v} \in \Sigma
       \text{ or }
-      \texttt{v}(\vec{x}) = \mathcal{F} \in \Gamma
+      \texttt{v}(\vec{x}) \ofspec \mathcal{F} \in \Gamma
     } {
         \Sigma; \Gamma \provable \hoareabbr{\Delta}{
           \texttt{v}
@@ -256,7 +256,7 @@ The judgement $\Sigma;\Gamma \provable \hoareabbr{\Delta_1}{e}{\texttt{r}}{\Delt
     }[]\label{rule:fv-var}
     \\
     \inferrule[Fv-Fun-Eval]{
-      \texttt{v}() = \textrm{Given } \vec{y}, \  \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}} \in \Gamma
+      \texttt{v}() \ofspec \textrm{Given } \vec{y}, \  \Phi_{\text{pre}} \rightarrowtail_{\mathtt{r} } \Phi_{\text{post}} \in \Gamma
       \and 
       \Delta \provable \Phi_{\text{pre}}(\vec{y})
     } {
@@ -274,9 +274,9 @@ The judgement $\Sigma;\Gamma \provable \hoareabbr{\Delta_1}{e}{\texttt{r}}{\Delt
 We use $\Sigma$ to denote the dynamic context of logical variables and use $\Gamma$ to denote the context of specifications available for the expression to call. Our system keeps track of the context during forward verification for each method declaration. \nameref{rule:fv-spec} and \nameref{rule:fv-exists} allows the verifier to extract the method declarations or existential variables users write in the precondition to the context.
 
 
-We use P to denote the program being checked. With pre/post conditions declared for each method in P, we can apply modular verification to a method’s body, as has been defined in \nameref{rule:fv-method}. 
+We use P to denote the program being checked. With pre/post conditions declared for each method in P, we can apply modular verification to a method’s body, as has been defined in \nameref{rule:fv-method}. When a new method is being verified, the variable context will be variables in the function arguments and \textsc{given} clause, and the specification context will be all the specifications in the program.
 
-\nameref{rule:fv-app-par} deals with partial application, which basically creates a new instance of specification for a partially applied function. Note that the function and the argument should both be evaluated before creating the specification. \nameref{rule:fv-app-full} deals with full application. When all the arguments of the specification has been applied with expressions, the verifier will check whether the precondition of the specification holds. Proving entailment will be presented in detail in the next section. If the entailment checker reports success, then the verifier can add the specified post condition to the inferred postcondition. Another thing to note is that the function specification may have variables or predicates to instantiate in the given clause, so the verifier should also infer the instances before proceeding the verification.
+\nameref{rule:fv-app-par} deals with partial application, which basically creates a new instance of specification for a partially applied function. Note that the function and the argument should both be evaluated before creating the specification. \nameref{rule:fv-app-full} deals with full application. When all the arguments of the specification has been applied with program expressions, the verifier will check whether the precondition of the specification holds. Proving entailment will be presented in detail in the next section. If the entailment checker reports success, then the verifier can add the specified post condition to the inferred postcondition. Another thing to note is that the function specification may have variables or predicates to instantiate in the \textsc{given} clause, so the verifier should also infer the instances before proceeding the verification.
 
 Apart from the standard structural rules such as \nameref{rule:fv-match}, \nameref{rule:fv-if}, \nameref{rule:fv-cst}, and \nameref{rule:fv-var}, our system also comprises a rule \nameref{rule:fv-fun-eval} for evaluating ``zero-ary'' function identifiers. Since our specification language supports nested function specifications in the assertion, the actual user-expected specification may be hidden in the assertion and needs unfolding. A verification example that uses this rule can be found in the next chapter.
 
@@ -285,11 +285,11 @@ Apart from the standard structural rules such as \nameref{rule:fv-match}, \namer
 
 The logical rules above provide some general guidelines to verify a program annotated by user-provided specifications. To implement a forward verifier system, we should fix the order of applying these rules to make it more organized and easier to implement. Furthermore, the instantiating in \nameref{rule:fv-app-full} is in general an undecidable problem. Our verifier can only infer some predicate instances for a function application, and the inferred result may lead to a failure in proof. To address these issues, we list some key steps in implementing our forward verifier system.
 
-The general structure of the forward verifier can be defined as a recursive function \texttt{infer\_exp} that takes as input the proof context $\mathcal{E}=(\Sigma,\Gamma)$, program expression $e$ and pre-condition $\Delta$. Due to the restriction we discussed about instantiating, the output is designed in a non-deterministic style, i.e. the recursive function will output a set of possible solutions, each solution comprises the its proof context $\mathcal{E'}$, return value name $\mathtt{r}$, and inferred post-condition $\Delta'$.
+The general structure of the forward verifier can be defined as a recursive function \texttt{infer\_exp} that takes as input the proof context $\mathcal{E}=(\Sigma,\Gamma)$, program expression $e$ and pre-condition $\Delta$. Due to the restriction we have discussed about instantiating, the output is designed in a non-deterministic style, i.e. the recursive function will output a set of possible solutions, each solution comprises the its proof context $\mathcal{E'}$, return value name $\mathtt{r}$, and inferred post-condition $\Delta'$.
 
 To implement \texttt{infer\_exp}, we always normalize the input precondition using \nameref{rule:fv-spec} and \nameref{rule:fv-exists} on entry to extract the specifications into the proof context. Then the verifier will choose a rule based on the structure of the program expression. More than one possible inferred postcondition may be returned by \nameref{rule:fv-app-full}.
 
-The recursive goes on following the syntax tree of the program expression $e$. After $e$ is evaluated, the verifier asks the entailment checker to check whether one of the triples $(\mathcal{E'}, \texttt{r}, \Delta')$ in the result can derive the expected post-condition. If so, the system can report that the method is verified w.r.t. the user-defined specification.
+The recursion goes on following the syntax of the program expression $e$. After $e$ is evaluated, the verifier asks the entailment checker to check whether one of the triples $(\mathcal{E'}, \texttt{r}, \Delta')$ in the result can derive the expected post-condition. If so, the system can report that the method is verified w.r.t. the user-defined specification.
 
 
 \section{Entailment checking}
@@ -299,12 +299,12 @@ At function call sites and the end of a method declaration, the forward verifier
 
 \begin{mathpar}
     \inferrule[Ent-Ass]{
-        \Sigma \provable  \left((\exists \vec{v}. \pi_1)\right)^{*} 
-            \Rightarrow \left((\exists \vec{v}. \pi_2)\right)^{*}
+        \Sigma \provable  \Delta_1
+            \Rightarrow \Delta_2
         \and
-        \Sigma; \Gamma; \left((\exists \vec{v}. \pi_1)\right)^{*} \provable \vec{\mathcal{F}_1} \rhd \vec{\mathcal{F}_2} 
+        \Sigma; \Gamma; \Delta_1 \provable \vec{\mathcal{F}_1} \rhd \vec{\mathcal{F}_2} 
     } {
-    \bigvee \left((\exists \vec{v}. \pi_1)\right)^{*} \wedge \vec{\mathcal{F}_1} \provable^{\Sigma;\Gamma} \bigvee \left((\exists \vec{v}. \pi_2)\right)^{*} \wedge \vec{\mathcal{F}_2} 
+     \Delta_1 \wedge \vec{\mathcal{F}_1} \provable^{\Sigma;\Gamma}  \Delta_2 \wedge \vec{\mathcal{F}_2} 
     }[]\label{rule:ent-ass}
 \end{mathpar}
 
@@ -313,13 +313,13 @@ Our job is to encode the proof entailments into a verification condition that Z3
 Since Z3 library has already provided a high-level API system for the OCaml programming language, most of the pure predicates such as arithmetic operations can be easily encoded as Z3 formulas. We will highlight several challenges and our solutions in the encoding.
 
 \paragraph{Verifying with abstract predicates} The syntax of our specification language allows user to write logical expressions with abstract predicate ${f(\vec{e})}$.
-What we mean by using an abstract predicate $f$ in a formula $\Delta_1(f) \entails \Delta_2(f)$ is that by replacing $f$ with any instance that matches the signature of $f$ we can always prove $\Delta_1 \entails \Delta_2$. The abstract predicate $f$ is encoded as an uninterpreted function in the SMT formula. 
+What we mean by using an abstract predicate $f$ in a formula $\Delta_1(f) \entails \Delta_2(f)$ is that by replacing $f$ with any instance that matches the type signature of $f$ we can always prove $\Delta_1 \entails \Delta_2$. The abstract predicate $f$ is encoded as an uninterpreted function in the SMT formula. 
 
 When there are uninterpreted formulas in the constraints, the Z3 solver will try to find instances of formulas that make the formula satisfiable. However, this solving process is different from our goal, since the \texttt{SAT} result for a direct encoding VC means $\exists f, \Delta_1(f) \entails \Delta_2(f)$ holds.
 The trick here is to encode the negation of the formula, i.e. we add $\Delta_1 \wedge \neg \Delta_2$ to the constraints of the solver. The idea is that the negation of an existential quantifier is universal. Now if the solver returns \texttt{UNSAT}, the entailment checker should report success.
 
 
-\paragraph{Verifying with concrete predicates} As the rule \nameref{rule:fv-app-full} shows, when we verify the application of a higher order specification with abstract predicates, we need to provide a concrete instance to predicates in the given clause. We will also see examples in the next chapter that users are able to write their own concrete predicates to help specify a function. To implement this feature, our solver will leave the original verification goal untouched, and add an extra constraint $\forall \vec{x}, f(\vec{x}) = \ldots $ to the Z3 constraints when certain predicates are instantiated.
+\paragraph{Verifying with concrete predicates} As the rule \nameref{rule:fv-app-full} shows, when we verify the application of a higher order specification with abstract predicates, we need to provide a concrete instance to predicates in the \textsc{given} clause. We will also see examples in the next chapter that users are able to write their own concrete predicates to help specify a function. To implement this feature, our solver will leave the original verification goal untouched, and add an extra constraint $\forall \vec{x}, f(\vec{x}) = \ldots $ to the Z3 constraints when certain predicates are instantiated.
 
 \paragraph{Verifying function specifications} An important component of our assertions are function specifications. We use the notion of \emph{function subsumption}~\cite{Andrew2021Subsumption} to model our solution to the specification part. We say if $\mathcal{F}_1$ is a function subsumption of $\mathcal{F}_2$, that is $\mathcal{F}_1 <: \mathcal{F}_2$, then any function satisfying specification $\mathcal{F}_1$ can be used wherever a function satisfying $\mathcal{F}_2$ is required.
 

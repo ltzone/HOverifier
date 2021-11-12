@@ -34,7 +34,7 @@ ensures[res] {EX (n:int), fpure(x,n) & fpure(n,res) } @*)
 \end{lstlisting}
 
 We show that our system is able to verify such method and specification by
-listing the verification process. First, \nameref{rule:fv-method} will extract
+listing the verification process. First, \nameref{rule:fv-spec} will extract
 the specification for \texttt{f} to the verification context so that it 
 can be used when verifying the function body. Next, \nameref{rule:fv-app-full} 
 will be applied twice, producing two anchors \texttt{res'}, \texttt{res}

@@ -7,19 +7,19 @@
 
 Many tools have been developed to verify the correctness of a program. One typical method towards program verification is to ask users to write specifications for a given program, and then the verifier will check the correctness of the program by using rules of a logical system to prove that the program behavior conforms to the user\zz{}given assertion. The assertion entailment will be encoded to a \emph{verification condition} (VC) in a \emph{satisfiability modulo theory} (SMT) and then discharged by SMT solvers such as Z3. The HIP/SLEEK~\cite{Chin2012HipSleek} system has managed to apply separation logic to verifying heap-manipulating imperative programs using this approach.
 
-However, automatically verifying programs with higher order functions is a topic yet to be explored. Many automatic verifiers
+However, automatically verifying programs with higher order functions is a topic yet to be explored. Many automatic verifiers, such as HIP/SLEEK, Dafny~\cite{Leino2010Dafny} and VeriFast~\cite{Jacobs2011Verifast}
 % dafny, hip/sleek
-have limited the programming language to a first-order language, which only allows users to write program expressions that operate on individual data elements (e.g., strings, integers, records, variants, etc.). By contrast, higher-order programming languages treat functions as first-class values, so that a higher-order function can operate on functions (\emph{function as parameter}) and return a function as result (\emph{function as returned value}). The use of higher-order functions can increase the modularity since they allow programmers to factor out functions and parameterize functions on other functions. In fact, the use of higher order functions is the essence of \emph{functional programming}. It is worth investigating what approaches will be applicable for automatic verification of functional programs.
+have limited their programming language to a first-order language, which only allows users to write program expressions that operate on individual data elements (e.g., strings, integers, records, variants, etc.). By contrast, higher-order programming languages treat functions as first-class values, so that a higher-order function can operate on functions (\emph{function as parameter}) and return a function as result (\emph{function as returned value}). The use of higher-order functions can increase the modularity since they allow programmers to factor out functions and parameterize functions on other functions. In fact, the use of higher order functions is the essence of \emph{functional programming}. It is worth investigating what approaches will be applicable for automatic verification of functional programs.
 
 
 \section{Current Work}
 
-The goal of this report is to provide a solution to automatic verification of higher order programs and implement a prototype system to verify several concrete examples of higher order programs. Higher order functional programming languages encompoass many programming language features and this project does not cover all of them. Therefore, the presentation of this report will be driven by higher-order programming examples, to see how far the automatic verification can go in a higher-order setting.
+The goal of this report is to provide a solution to automatic verification of higher order programs and implement a prototype system to verify several concrete examples of higher order programs. Higher order functional programming languages encompoass many programming language features and this project does not cover all of them. Therefore, the presentation of this report will be driven by higher-order programming examples, to see how far automatic verification can go in a higher-order setting.
 
 In this project we take a subset language of OCaml~\cite{OCaml}, an industrial\zz{}strength functional programming language, and explore the automatic verification of higher order functions based on the structure of HIP/SLEEK system.
 
 Currently, this report focuses on one specific target language OCaml and supports reasoning
-on pure properties of immutable variables. However the techniques such as abstraction
+on pure properties of immutable variables. However the techniques such as abstract
 predicates and nested function specifications in the design of this project can also be extended
 to a larger category of programming languages and features. Our system also has the potential
 to integrate with the HIP/SLEEK system, to enable more sophisticated reasoning on mutable
